@@ -1,0 +1,21 @@
+{
+  "name": "workops-suite-monorepo-next",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "lint": "eslint packages/backend/amplify",
+    "typecheck": "npm run typecheck --workspace=@workops/backend",
+    "sandbox": "npm run sandbox --workspace=@workops/backend --"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.14.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.1"
+  }
+}
