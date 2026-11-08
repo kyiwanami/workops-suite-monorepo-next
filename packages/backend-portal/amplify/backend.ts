@@ -1,6 +1,7 @@
 import { defineBackend } from '@aws-amplify/backend';
 import outputs from '@workops/backend/outputs';
 import { OAuthScope, UserPool } from 'aws-cdk-lib/aws-cognito';
+import { PolicyStatement, Role, ServicePrincipal } from 'aws-cdk-lib/aws-iam';
 
 // ポータルのアプリクライアントを、共有のユーザープールに作ります。
 // Hosting では組み込みの環境変数からアプリの URL を作り、手元では localhost を使います。
@@ -19,6 +20,32 @@ const client = userPool.addClient('PortalClient', {
   oAuth: { flows: { authorizationCodeGrant: true }, scopes, callbackUrls: [signInUrl], logoutUrls: [signOutUrl] },
   preventUserExistenceErrors: true,
 });
+
+// Hosting のポータルが、サーバー側の処理で共有の Aurora を Data API で読み書きするための Compute ロールです。
+// 手元の開発サーバーは起動時のプロファイルで接続するため、Hosting のときだけ作ります。
+if (process.env.AWS_APP_ID !== undefined) {
+  const computeRole = new Role(app.createStack('compute'), 'ComputeRole', {
+    assumedBy: new ServicePrincipal('amplify.amazonaws.com'),
+  });
+  computeRole.addToPolicy(
+    new PolicyStatement({
+      actions: [
+        'rds-data:ExecuteStatement',
+        'rds-data:BatchExecuteStatement',
+        'rds-data:BeginTransaction',
+        'rds-data:CommitTransaction',
+        'rds-data:RollbackTransaction',
+      ],
+      resources: [outputs.custom.database.clusterArn],
+    }),
+  );
+  computeRole.addToPolicy(
+    new PolicyStatement({
+      actions: ['secretsmanager:GetSecretValue'],
+      resources: [outputs.custom.database.secretArn],
+    }),
+  );
+}
 
 // ポータルが読む設定です。共有のユーザープールとログイン画面に、ポータルのクライアントと戻り先を合わせます。
 app.addOutput({
