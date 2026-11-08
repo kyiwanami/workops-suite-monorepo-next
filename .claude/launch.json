@@ -6,6 +6,18 @@
       "runtimeExecutable": "cmd",
       "runtimeArgs": ["/c", "set AWS_PROFILE=amazon-connect&& npm run dev:portal"],
       "port": 3000
+    },
+    {
+      "name": "asset",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "set AWS_PROFILE=amazon-connect&& npm run dev:asset"],
+      "port": 3001
+    },
+    {
+      "name": "request",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "set AWS_PROFILE=amazon-connect&& npm run dev:request"],
+      "port": 3002
     }
   ]
 }

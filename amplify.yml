@@ -43,3 +43,51 @@ applications:
       cache:
         paths:
           - node_modules/**/*
+  - appRoot: apps/asset
+    frontend:
+      # モノレポのルートから install とビルドを実行します。
+      buildPath: /
+      phases:
+        preBuild:
+          commands:
+            - nvm install 24
+            - npm ci
+        build:
+          commands:
+            # 共有バックエンドの出力を取得し、共有のユーザープールに資産カタログのクライアントを作ります。
+            - npx ampx generate outputs --app-id $BACKEND_APP_ID --branch main --out-dir packages/backend
+            - npm exec --workspace=@workops/backend-asset -- ampx pipeline-deploy --branch $AWS_BRANCH --app-id $AWS_APP_ID
+            # サーバー側の実行時に使うアプリのオリジンを書き出します。
+            - echo "AMPLIFY_APP_ORIGIN=https://$AWS_BRANCH.$AWS_APP_ID.amplifyapp.com" >> apps/asset/.env.production
+            - npm run build --workspace=@workops/asset
+      artifacts:
+        baseDirectory: apps/asset/.next
+        files:
+          - '**/*'
+      cache:
+        paths:
+          - node_modules/**/*
+  - appRoot: apps/request
+    frontend:
+      # モノレポのルートから install とビルドを実行します。
+      buildPath: /
+      phases:
+        preBuild:
+          commands:
+            - nvm install 24
+            - npm ci
+        build:
+          commands:
+            # 共有バックエンドの出力を取得し、共有のユーザープールに申請管理のクライアントを作ります。
+            - npx ampx generate outputs --app-id $BACKEND_APP_ID --branch main --out-dir packages/backend
+            - npm exec --workspace=@workops/backend-request -- ampx pipeline-deploy --branch $AWS_BRANCH --app-id $AWS_APP_ID
+            # サーバー側の実行時に使うアプリのオリジンを書き出します。
+            - echo "AMPLIFY_APP_ORIGIN=https://$AWS_BRANCH.$AWS_APP_ID.amplifyapp.com" >> apps/request/.env.production
+            - npm run build --workspace=@workops/request
+      artifacts:
+        baseDirectory: apps/request/.next
+        files:
+          - '**/*'
+      cache:
+        paths:
+          - node_modules/**/*

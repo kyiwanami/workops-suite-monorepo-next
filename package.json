@@ -9,11 +9,15 @@
     "node": ">=24 <25"
   },
   "scripts": {
-    "lint": "eslint packages/backend/amplify packages/backend-portal/amplify packages/blocks packages/server apps/portal/src",
+    "lint": "node --max-old-space-size=8192 node_modules/eslint/bin/eslint.js packages/backend/amplify packages/backend-portal/amplify packages/backend-asset/amplify packages/backend-request/amplify packages/blocks packages/server apps/portal/src apps/asset/src apps/request/src",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "sandbox": "npm --node-options=--conditions=cdk run sandbox --workspace=@workops/backend --",
     "dev:portal": "npm run dev --workspace=@workops/portal",
-    "sandbox:portal": "npm run sandbox --workspace=@workops/backend-portal --"
+    "sandbox:portal": "npm run sandbox --workspace=@workops/backend-portal --",
+    "dev:asset": "npm run dev --workspace=@workops/asset",
+    "sandbox:asset": "npm run sandbox --workspace=@workops/backend-asset --",
+    "dev:request": "npm run dev --workspace=@workops/request",
+    "sandbox:request": "npm run sandbox --workspace=@workops/backend-request --"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
