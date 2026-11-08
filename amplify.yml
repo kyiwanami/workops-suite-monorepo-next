@@ -1,39 +1,38 @@
 version: 1
 applications:
   - appRoot: packages/backend
-    backend:
+    frontend:
+      # モノレポのルートから install とデプロイを実行します。
+      buildPath: /
       phases:
-        build:
+        preBuild:
           commands:
             - nvm install 24
-            # 共有のユーザープール・ログイン画面のドメイン・Aurora をデプロイします。
-            - cd $CODEBUILD_SRC_DIR && npm ci
-            - cd $CODEBUILD_SRC_DIR && npm --node-options=--conditions=cdk exec --workspace=@workops/backend -- ampx pipeline-deploy --branch $AWS_BRANCH --app-id $AWS_APP_ID
-    frontend:
-      phases:
+            - npm ci
         build:
           commands:
+            # 共有のユーザープール・ログイン画面のドメイン・Aurora をデプロイします。
+            - npm --node-options=--conditions=cdk exec --workspace=@workops/backend -- ampx pipeline-deploy --branch $AWS_BRANCH --app-id $AWS_APP_ID
             # 共有バックエンドには画面がないため、空のページを配置します。
-            - mkdir -p dist && touch dist/index.html
+            - mkdir -p packages/backend/dist && touch packages/backend/dist/index.html
       artifacts:
-        baseDirectory: dist
+        baseDirectory: packages/backend/dist
         files:
           - '**/*'
   - appRoot: apps/portal
-    backend:
-      phases:
-        build:
-          commands:
-            - nvm install 24
-            - cd $CODEBUILD_SRC_DIR && npm ci
-            # 共有バックエンドの出力を取得し、共有のユーザープールにポータルのクライアントを作ります。
-            - cd $CODEBUILD_SRC_DIR && npx ampx generate outputs --app-id $BACKEND_APP_ID --branch main --out-dir packages/backend
-            - cd $CODEBUILD_SRC_DIR && npm exec --workspace=@workops/backend-portal -- ampx pipeline-deploy --branch $AWS_BRANCH --app-id $AWS_APP_ID
     frontend:
+      # モノレポのルートから install とビルドを実行します。
       buildPath: /
       phases:
+        preBuild:
+          commands:
+            - nvm install 24
+            - npm ci
         build:
           commands:
+            # 共有バックエンドの出力を取得し、共有のユーザープールにポータルのクライアントを作ります。
+            - npx ampx generate outputs --app-id $BACKEND_APP_ID --branch main --out-dir packages/backend
+            - npm exec --workspace=@workops/backend-portal -- ampx pipeline-deploy --branch $AWS_BRANCH --app-id $AWS_APP_ID
             # サーバー側の実行時に使うアプリのオリジンを書き出します。
             - echo "AMPLIFY_APP_ORIGIN=https://$AWS_BRANCH.$AWS_APP_ID.amplifyapp.com" >> apps/portal/.env.production
             - npm run build --workspace=@workops/portal
