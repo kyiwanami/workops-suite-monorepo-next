@@ -40,3 +40,32 @@ DB接続にはBlocksが生成する管理者用Secretを使用します。
 接続設定は`packages/backend/amplify_outputs.json`に自動生成されます。`auth`にユーザープールIDとリージョン、`custom.authDomain`にドメイン、`custom.database`にDB接続情報が入ります。
 `clusterArn`、Blocks標準の`secretArn`、`databaseName`を出力し、認証情報の値はSecrets Managerで管理します。
 このファイルは手動編集せず、Git管理から除外します。
+
+## ポータル
+
+ポータルのフロントエンドは`apps/portal`、ポータルのバックエンドは`packages/backend-portal`に配置しています。
+ポータルのバックエンドは、共有のユーザープールにポータルのアプリクライアントを作ります。
+共有バックエンドの`amplify_outputs.json`を読むため、共有バックエンドのsandboxをデプロイしてから実行します。
+
+```powershell
+$env:AWS_REGION = 'ap-northeast-1'
+npm run sandbox:portal -- --profile amazon-connect --identifier workops-portal --once
+```
+
+接続設定は`packages/backend-portal/amplify_outputs.json`に自動生成され、ポータルは`@workops/backend-portal/outputs`として読みます。
+クライアントの戻り先は`http://localhost:3000`です。
+
+`apps/portal/.env.local`に、ポータルのオリジンを書きます。
+
+```dotenv
+AMPLIFY_APP_ORIGIN=http://localhost:3000
+```
+
+開発サーバーは、DBに接続するプロファイルを指定して起動します。
+
+```powershell
+$env:AWS_PROFILE = 'amazon-connect'
+npm run dev:portal
+```
+
+`http://localhost:3000`を開くと、共有のログイン画面へ転送されます。

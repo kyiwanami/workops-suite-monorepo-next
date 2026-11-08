@@ -9,3 +9,7 @@ amplifyconfiguration*
 
 # 作業用
 tmp
+
+# Next.js
+.next
+next-env.d.ts

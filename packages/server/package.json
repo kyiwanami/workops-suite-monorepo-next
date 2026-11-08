@@ -1,0 +1,30 @@
+{
+  "name": "@workops/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./user": "./user.ts",
+    "./db": "./db.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aws-amplify/adapter-nextjs": "1.8.1",
+    "@aws-sdk/client-rds-data": "3.1164.0",
+    "@workops/backend": "*",
+    "@workops/blocks": "*",
+    "aws-amplify": "6.22.2",
+    "drizzle-orm": "1.0.0-rc.5",
+    "server-only": "0.0.1"
+  },
+  "peerDependencies": {
+    "next": "16.4.5",
+    "react": "19.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0"
+  }
+}
