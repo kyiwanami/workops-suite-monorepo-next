@@ -15,7 +15,10 @@
     },
     "strictNullChecks": true,
     "exactOptionalPropertyTypes": true,
-    "noEmit": true
+    "noEmit": true,
+    "types": [
+      "node"
+    ]
   },
   "include": [
     "**/*.ts"

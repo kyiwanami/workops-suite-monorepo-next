@@ -1,0 +1,4 @@
+{
+  "extends": "../backend/amplify/tsconfig.json",
+  "include": ["./**/*.ts"]
+}

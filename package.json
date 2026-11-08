@@ -8,9 +8,9 @@
     "node": ">=24 <25"
   },
   "scripts": {
-    "lint": "eslint packages/backend/amplify",
-    "typecheck": "npm run typecheck --workspace=@workops/backend",
-    "sandbox": "npm run sandbox --workspace=@workops/backend --"
+    "lint": "eslint packages/backend/amplify packages/blocks",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "sandbox": "npm --node-options=--conditions=cdk run sandbox --workspace=@workops/backend --"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

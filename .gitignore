@@ -6,3 +6,6 @@ amplifyconfiguration*
 *.tsbuildinfo
 .env
 .env.*
+
+# 作業用
+tmp
