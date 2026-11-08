@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { defineBackend } from '@aws-amplify/backend';
 import { createBlocksBackend } from '@workops/blocks/cdk';
-import { UserPool } from 'aws-cdk-lib/aws-cognito';
+import { ManagedLoginVersion, UserPool } from 'aws-cdk-lib/aws-cognito';
 
 const app = defineBackend({});
 
@@ -16,8 +16,12 @@ const userPool = new UserPool(stack, 'UserPool', {
 });
 
 // 全アプリで共有するログイン画面のドメインです。プレフィックスはバックエンドごとに一意で、デプロイしても変わりません。
+// ログイン画面はマネージドログインで表示し、見た目は各アプリのクライアントに割り当てるスタイルで決めます。
 const prefix = createHash('sha256').update(app.stack.stackName).digest('hex').slice(0, 20);
-userPool.addDomain('LoginDomain', { cognitoDomain: { domainPrefix: `workops-${prefix}` } });
+userPool.addDomain('LoginDomain', {
+  cognitoDomain: { domainPrefix: `workops-${prefix}` },
+  managedLoginVersion: ManagedLoginVersion.NEWER_MANAGED_LOGIN,
+});
 
 // 各アプリがクライアントを作るときと、サーバー側の処理で読む値です。
 app.addOutput({

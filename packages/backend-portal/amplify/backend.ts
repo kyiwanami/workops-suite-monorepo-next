@@ -1,6 +1,6 @@
 import { defineBackend } from '@aws-amplify/backend';
 import outputs from '@workops/backend/outputs';
-import { OAuthScope, UserPool } from 'aws-cdk-lib/aws-cognito';
+import { CfnManagedLoginBranding, OAuthScope, UserPool } from 'aws-cdk-lib/aws-cognito';
 import { PolicyStatement, Role, ServicePrincipal } from 'aws-cdk-lib/aws-iam';
 
 // ポータルのアプリクライアントを、共有のユーザープールに作ります。
@@ -19,6 +19,13 @@ const userPool = UserPool.fromUserPoolId(stack, 'SharedUserPool', outputs.auth.u
 const client = userPool.addClient('PortalClient', {
   oAuth: { flows: { authorizationCodeGrant: true }, scopes, callbackUrls: [signInUrl], logoutUrls: [signOutUrl] },
   preventUserExistenceErrors: true,
+});
+
+// ポータルのクライアントのログイン画面に、Cognito の標準のスタイルを割り当てます。
+new CfnManagedLoginBranding(stack, 'LoginBranding', {
+  userPoolId: outputs.auth.user_pool_id,
+  clientId: client.userPoolClientId,
+  useCognitoProvidedValues: true,
 });
 
 // Hosting のポータルが、サーバー側の処理で共有の Aurora を Data API で読み書きするための Compute ロールです。

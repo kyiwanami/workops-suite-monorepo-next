@@ -3,7 +3,7 @@
 Amplify Gen 2の共有バックエンドを管理するnpm workspacesのモノレポです。Node.js 24を使用します。
 共有のユーザープールとログイン画面のドメインは`packages/backend/amplify`、BlocksのAurora定義とDBスキーマは`packages/blocks`に配置しています。
 `@workops/backend`はAmplify、`@workops/blocks`はBlocksとDBスキーマ・マイグレーションを管理するワークスペースです。
-`amplify/backend.ts`でユーザープールとドメインを作り、`@workops/blocks/cdk`を接続して、ユーザープールID・リージョン・ドメイン・DB接続情報を出力します。
+`amplify/backend.ts`でユーザープールとマネージドログインのドメインを作り、`@workops/blocks/cdk`を接続して、ユーザープールID・リージョン・ドメイン・DB接続情報を出力します。
 Blocksの構築とDBのCDK設定は`packages/blocks/index.cdk.ts`で管理します。
 DBのBlock定義は`packages/blocks/index.ts`、テーブル定義は`packages/blocks/schema.ts`に置きます。
 
@@ -44,7 +44,7 @@ DB接続にはBlocksが生成する管理者用Secretを使用します。
 ## ポータル
 
 ポータルのフロントエンドは`apps/portal`、ポータルのバックエンドは`packages/backend-portal`に配置しています。
-ポータルのバックエンドは、共有のユーザープールにポータルのアプリクライアントを作ります。
+ポータルのバックエンドは、共有のユーザープールにポータルのアプリクライアントを作り、マネージドログインのスタイルを割り当てます。
 共有バックエンドの`amplify_outputs.json`を読むため、共有バックエンドのsandboxをデプロイしてから実行します。
 
 ```powershell
