@@ -1,0 +1,27 @@
+version: 1
+applications:
+  - appRoot: apps/portal
+    backend:
+      phases:
+        build:
+          commands:
+            - nvm install 24
+            - npm ci
+            # 共有バックエンドの出力を取得し、共有のユーザープールにポータルのクライアントを作ります。
+            - npx ampx generate outputs --app-id $BACKEND_APP_ID --branch main --out-dir packages/backend
+            - npm exec --workspace=@workops/backend-portal -- ampx pipeline-deploy --branch $AWS_BRANCH --app-id $AWS_APP_ID
+    frontend:
+      buildPath: /
+      phases:
+        build:
+          commands:
+            # サーバー側の実行時に使うアプリのオリジンを書き出します。
+            - echo "AMPLIFY_APP_ORIGIN=https://$AWS_BRANCH.$AWS_APP_ID.amplifyapp.com" >> apps/portal/.env.production
+            - npm run build --workspace=@workops/portal
+      artifacts:
+        baseDirectory: apps/portal/.next
+        files:
+          - '**/*'
+      cache:
+        paths:
+          - node_modules/**/*

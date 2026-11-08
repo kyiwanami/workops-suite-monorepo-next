@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "portal",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "set AWS_PROFILE=amazon-connect&& npm run dev:portal"],
+      "port": 3000
+    }
+  ]
+}
