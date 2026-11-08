@@ -1,6 +1,8 @@
 import { defineBackend } from '@aws-amplify/backend';
 import outputs from '@workops/backend/outputs';
 import { CfnManagedLoginBranding, OAuthScope, UserPool } from 'aws-cdk-lib/aws-cognito';
+import { Rule } from 'aws-cdk-lib/aws-events';
+import { AwsApi } from 'aws-cdk-lib/aws-events-targets';
 import { PolicyStatement, Role, ServicePrincipal } from 'aws-cdk-lib/aws-iam';
 
 // ポータルのアプリクライアントを、共有のユーザープールに作ります。
@@ -52,6 +54,30 @@ if (process.env.AWS_APP_ID !== undefined) {
       resources: [outputs.custom.database.secretArn],
     }),
   );
+
+  // 共有バックエンドの main のデプロイが成功したら、ポータルのビルドを始めます。
+  // ポータルは共有バックエンドの出力を読むため、共有バックエンドのデプロイが終わってからビルドします。
+  const buildStack = app.createStack('build');
+  new Rule(buildStack, 'BackendDeployed', {
+    eventPattern: {
+      source: ['aws.amplify'],
+      detailType: ['Amplify Deployment Status Change'],
+      detail: { appId: [process.env.BACKEND_APP_ID], branchName: ['main'], jobStatus: ['SUCCEED'] },
+    },
+    targets: [
+      new AwsApi({
+        service: 'Amplify',
+        action: 'startJob',
+        parameters: { appId: process.env.AWS_APP_ID, branchName: process.env.AWS_BRANCH, jobType: 'RELEASE' },
+        policyStatement: new PolicyStatement({
+          actions: ['amplify:StartJob'],
+          resources: [
+            `arn:aws:amplify:${buildStack.region}:${buildStack.account}:apps/${process.env.AWS_APP_ID}/branches/${process.env.AWS_BRANCH}/jobs/*`,
+          ],
+        }),
+      }),
+    ],
+  });
 }
 
 // ポータルが読む設定です。共有のユーザープールとログイン画面に、ポータルのクライアントと戻り先を合わせます。
