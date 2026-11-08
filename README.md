@@ -69,3 +69,6 @@ npm run dev:portal
 ```
 
 `http://localhost:3000`を開くと、共有のログイン画面へ転送されます。
+
+Hostingでは、ポータルのバックエンドがCompute ロールを作ります。サーバー側の処理は、このロールで共有のAuroraをData API経由で読み書きします。
+ロールは、ポータルのHostingアプリのCompute ロールに割り当てます。
