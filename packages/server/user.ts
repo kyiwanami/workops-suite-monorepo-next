@@ -1,6 +1,6 @@
 import 'server-only';
 import type { createServerRunner } from '@aws-amplify/adapter-nextjs';
-import { userMembership } from '@workops/blocks/schema';
+import { department, userMembership } from '@workops/blocks/schema';
 import { fetchUserAttributes, getCurrentUser } from 'aws-amplify/auth/server';
 import { eq } from 'drizzle-orm';
 import { cookies } from 'next/headers';
@@ -19,17 +19,19 @@ export const createUserQueries = (
     }),
   );
 
-  // ログイン中の利用者の所属・ロール・全体管理者区分です。所属が未設定ならnullを返します。
+  // ログイン中の利用者の所属・部署名・ロール・全体管理者区分です。所属が未設定ならnullを返します。
   const getMembership = cache(async () => {
     const user = await getUser();
     const memberships = await db
       .select({
         sub: userMembership.sub,
         departmentId: userMembership.departmentId,
+        departmentName: department.name,
         role: userMembership.role,
         isAdmin: userMembership.isAdmin,
       })
       .from(userMembership)
+      .innerJoin(department, eq(department.id, userMembership.departmentId))
       .where(eq(userMembership.sub, user.userId));
     return memberships.at(0) ?? null;
   });

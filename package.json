@@ -9,7 +9,7 @@
     "node": ">=24 <25"
   },
   "scripts": {
-    "lint": "node --max-old-space-size=8192 node_modules/eslint/bin/eslint.js packages/backend/amplify packages/backend-portal/amplify packages/backend-asset/amplify packages/backend-request/amplify packages/blocks packages/server apps/portal/src apps/asset/src apps/request/src",
+    "lint": "node --max-old-space-size=8192 node_modules/eslint/bin/eslint.js packages/backend/amplify packages/backend-portal/amplify packages/backend-asset/amplify packages/backend-request/amplify packages/ui/src/workops packages/blocks packages/server apps/portal/src apps/asset/src apps/request/src",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "sandbox": "npm --node-options=--conditions=cdk run sandbox --workspace=@workops/backend --",
     "dev:portal": "npm run dev --workspace=@workops/portal",

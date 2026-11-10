@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     "./user": "./user.ts",
-    "./db": "./db.ts"
+    "./db": "./db.ts",
+    "./app": "./app.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
