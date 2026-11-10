@@ -1,0 +1,115 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@source "../../../../apps/**/*.{ts,tsx}";
+@source "../**/*.{ts,tsx}";
+
+@custom-variant dark (&:is(.dark *));
+
+/* Workops Suite のデザインシステムの色です。名前と役割は shadcn/ui のテーマ変数に合わせ、success・warning・ai を足しています。 */
+:root {
+  --radius: 10px;
+  --shadow-alpha: 0.1;
+  --background: #f6f8fb;
+  --foreground: #16202e;
+  --card: #ffffff;
+  --card-foreground: #16202e;
+  --popover: #ffffff;
+  --popover-foreground: #16202e;
+  --primary: #2459d6;
+  --primary-foreground: #ffffff;
+  --secondary: #eef1f6;
+  --secondary-foreground: #16202e;
+  --muted: #eef1f6;
+  --muted-foreground: #556173;
+  --accent: #eef1f6;
+  --accent-foreground: #16202e;
+  --destructive: #c0281f;
+  --destructive-foreground: #ffffff;
+  --border: #d5dbe5;
+  --input: #8590a2;
+  --ring: #2459d6;
+  --success: #166c36;
+  --success-foreground: #ffffff;
+  --warning: #8a5300;
+  --warning-foreground: #ffffff;
+  --ai: #0a6b60;
+  --ai-foreground: #ffffff;
+}
+
+.dark {
+  --shadow-alpha: 0.5;
+  --background: #0e141d;
+  --foreground: #e8edf5;
+  --card: #161e2a;
+  --card-foreground: #e8edf5;
+  --popover: #161e2a;
+  --popover-foreground: #e8edf5;
+  --primary: #6f9cff;
+  --primary-foreground: #0b1730;
+  --secondary: #232d3c;
+  --secondary-foreground: #e8edf5;
+  --muted: #0a0f16;
+  --muted-foreground: #a3aebf;
+  --accent: #232d3c;
+  --accent-foreground: #e8edf5;
+  --destructive: #ff8a80;
+  --destructive-foreground: #3a0d09;
+  --border: #2a3545;
+  --input: #6b7a90;
+  --ring: #8fb2ff;
+  --success: #5fd38a;
+  --success-foreground: #06230f;
+  --warning: #f2b24a;
+  --warning-foreground: #2b1d00;
+  --ai: #3fd2bf;
+  --ai-foreground: #06231f;
+}
+
+@theme inline {
+  --font-sans: var(--font-biz-udpgothic), "Hiragino Sans", "Yu Gothic UI", Meiryo, sans-serif;
+  --font-mono: var(--font-biz-udgothic), "Hiragino Sans", "Yu Gothic UI", Meiryo, monospace;
+  /* BIZ UD には 500 の太さがないため、shadcn/ui の font-medium を 700 で描きます。 */
+  --font-weight-medium: 700;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-ai: var(--ai);
+  --color-ai-foreground: var(--ai-foreground);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  /* 影の濃さは、ライトで 10%、ダークで 50% にします。 */
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / var(--shadow-alpha)), 0 1px 2px -1px rgb(0 0 0 / var(--shadow-alpha));
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / var(--shadow-alpha)), 0 4px 6px -4px rgb(0 0 0 / var(--shadow-alpha));
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring;
+  }
+  body {
+    @apply bg-background text-sm text-foreground;
+  }
+}

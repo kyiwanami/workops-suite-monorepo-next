@@ -3,7 +3,7 @@ import outputs from '@workops/backend/outputs';
 import { CfnManagedLoginBranding, OAuthScope, UserPool } from 'aws-cdk-lib/aws-cognito';
 import { Rule } from 'aws-cdk-lib/aws-events';
 import { AwsApi } from 'aws-cdk-lib/aws-events-targets';
-import { PolicyStatement } from 'aws-cdk-lib/aws-iam';
+import { PolicyStatement, Role, ServicePrincipal } from 'aws-cdk-lib/aws-iam';
 
 // 資産カタログのアプリクライアントを、共有のユーザープールに作ります。
 // Hosting では組み込みの環境変数からアプリの URL を作り、手元では localhost を使います。
@@ -30,9 +30,32 @@ new CfnManagedLoginBranding(stack, 'LoginBranding', {
   useCognitoProvidedValues: true,
 });
 
-// 共有バックエンドの main のデプロイが成功したら、資産カタログのビルドを始めます。
-// 資産カタログは共有バックエンドの出力を読むため、共有バックエンドのデプロイが終わってからビルドします。
+// Hosting の資産カタログが、サーバー側の処理で共有の Aurora を Data API で読み書きするための Compute ロールです。
 if (process.env.AWS_APP_ID !== undefined) {
+  const computeRole = new Role(app.createStack('compute'), 'ComputeRole', {
+    assumedBy: new ServicePrincipal('amplify.amazonaws.com'),
+  });
+  computeRole.addToPolicy(
+    new PolicyStatement({
+      actions: [
+        'rds-data:ExecuteStatement',
+        'rds-data:BatchExecuteStatement',
+        'rds-data:BeginTransaction',
+        'rds-data:CommitTransaction',
+        'rds-data:RollbackTransaction',
+      ],
+      resources: [outputs.custom.database.clusterArn],
+    }),
+  );
+  computeRole.addToPolicy(
+    new PolicyStatement({
+      actions: ['secretsmanager:GetSecretValue'],
+      resources: [outputs.custom.database.secretArn],
+    }),
+  );
+
+  // 共有バックエンドの main のデプロイが成功したら、資産カタログのビルドを始めます。
+  // 資産カタログは共有バックエンドの出力を読むため、共有バックエンドのデプロイが終わってからビルドします。
   const buildStack = app.createStack('build');
   new Rule(buildStack, 'BackendDeployed', {
     eventPattern: {

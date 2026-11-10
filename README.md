@@ -90,9 +90,10 @@ npm run sandbox:asset -- --profile amazon-connect --identifier workops-asset --o
 AMPLIFY_APP_ORIGIN=http://localhost:3001
 ```
 
-開発サーバーを起動します。
+開発サーバーは、DBに接続するプロファイルを指定して起動します。
 
 ```powershell
+$env:AWS_PROFILE = 'amazon-connect'
 npm run dev:asset
 ```
 
@@ -104,6 +105,18 @@ npm run dev:asset
 資産カタログと同じ形で、sandboxは`npm run sandbox:request -- --profile amazon-connect --identifier workops-request --once`、開発サーバーは`npm run dev:request`で動かします。
 クライアントの戻り先と`apps/request/.env.local`の`AMPLIFY_APP_ORIGIN`は、`http://localhost:3002`です。
 
+## 共通UI
+
+3つのアプリの見た目は、`packages/ui`（`@workops/ui`）にまとめています。色のトークン・書体・テーマは`src/styles/globals.css`、shadcn/uiの部品は`src/components`、共通のヘッダーなどWorkopsの部品は`src/workops`に置きます。
+shadcn/uiの部品は、アプリのフォルダーで追加します。部品は`packages/ui/src/components`に入ります。
+
+```powershell
+cd apps/portal
+npx shadcn@latest add <部品名>
+```
+
+ヘッダーのアプリの切替は、DBの`App`テーブルの`appId`・`name`・`urlDomain`から作ります。`urlDomain`には、環境ごとのアプリのURLを登録します。
+
 ## Hosting
 
 Hostingのアプリは、共有バックエンド・ポータル・資産カタログ・申請管理の4つです。どれもリポジトリルートの`amplify.yml`でビルドします。
@@ -112,7 +125,7 @@ Hostingのアプリは、共有バックエンド・ポータル・資産カタ�
 2. ポータルのアプリを、モノレポのルートを`apps/portal`にして作ります。サービスロールには、共有バックエンドのアプリのサービスロールを指定します。詳細設定の環境変数`BACKEND_APP_ID`に、共有バックエンドのアプリIDを入れます。
 3. ポータルのアプリの`main`ブランチの自動ビルドを止めます。ポータルのビルドは、共有バックエンドのデプロイが成功したときに、ポータルのバックエンドが作るEventBridgeのルールで始まります。
 4. ポータルの最初のビルドで、ポータルのバックエンドがCompute ロールを作ります。このロールを、ポータルのアプリのCompute ロールに割り当てます。
-5. 資産カタログと申請管理のアプリを、モノレポのルートをそれぞれ`apps/asset`・`apps/request`にして、ポータルの2と3と同じ設定で作ります。
+5. 資産カタログと申請管理のアプリを、モノレポのルートをそれぞれ`apps/asset`・`apps/request`にして、ポータルの2〜4と同じ設定で作ります。
 
 サーバー側の処理は、Compute ロールで共有のAuroraをData API経由で読み書きします。
 

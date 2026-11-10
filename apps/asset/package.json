@@ -13,6 +13,7 @@
     "@aws-amplify/adapter-nextjs": "1.8.1",
     "@workops/backend-asset": "*",
     "@workops/server": "*",
+    "@workops/ui": "*",
     "aws-amplify": "6.22.2",
     "next": "16.4.5",
     "react": "19.3.1",

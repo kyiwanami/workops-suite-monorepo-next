@@ -31,7 +31,6 @@ new CfnManagedLoginBranding(stack, 'LoginBranding', {
 });
 
 // Hosting のポータルが、サーバー側の処理で共有の Aurora を Data API で読み書きするための Compute ロールです。
-// 手元の開発サーバーは起動時のプロファイルで接続するため、Hosting のときだけ作ります。
 if (process.env.AWS_APP_ID !== undefined) {
   const computeRole = new Role(app.createStack('compute'), 'ComputeRole', {
     assumedBy: new ServicePrincipal('amplify.amazonaws.com'),
