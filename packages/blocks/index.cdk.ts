@@ -1,5 +1,5 @@
 import { BlocksBackend, BlocksPresets } from '@aws-blocks/blocks/cdk';
-import { CustomResource, Stack } from 'aws-cdk-lib';
+import { CustomResource, Duration, Stack } from 'aws-cdk-lib';
 import { Code, LayerVersion, Runtime } from 'aws-cdk-lib/aws-lambda';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import { DatabaseCluster } from 'aws-cdk-lib/aws-rds';
@@ -33,6 +33,8 @@ export async function createBlocksBackend(root: Stack) {
     handler: 'isComplete',
     runtime: Runtime.NODEJS_24_X,
     layers: [migrations],
+    // Data APIの1文の上限は45秒のため、複数の文を流せる長さにします。
+    timeout: Duration.minutes(5),
     environment: { DATABASE_NAME: databaseName, SECRET_ARN: db.secret.secretArn, CLUSTER_ARN: db.clusterArn },
   });
   db.grantDataApiAccess(isComplete);
