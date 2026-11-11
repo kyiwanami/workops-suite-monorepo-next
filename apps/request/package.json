@@ -11,14 +11,22 @@
   },
   "dependencies": {
     "@aws-amplify/adapter-nextjs": "1.8.1",
+    "@hookform/resolvers": "7.0.5",
     "@workops/backend-request": "*",
+    "@workops/blocks": "*",
     "@workops/server": "*",
     "@workops/ui": "*",
     "aws-amplify": "6.22.2",
+    "cn": "^0.5.2",
+    "drizzle-orm": "1.0.0-rc.5",
+    "lucide-react": "1.70.0",
     "next": "16.4.5",
+    "nuqs": "2.10.3",
     "react": "19.3.1",
     "react-dom": "19.3.1",
-    "server-only": "0.0.1"
+    "react-hook-form": "7.91.0",
+    "server-only": "0.0.1",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@types/node": "24.19.2",

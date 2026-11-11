@@ -96,7 +96,7 @@ export const request = pgTable('Request', {
   title: text().notNull(), // 件名
   description: text(), // 説明
   amount: integer(), // 金額
-  status: text().notNull(), // 申請の状態
+  status: text({ enum: ['draft', 'submitted', 'approved', 'rejected', 'withdrawn'] }).notNull(), // 申請の状態
   submittedAt: timestamp({ withTimezone: true, mode: 'string' }), // 提出日時
   approvedAt: timestamp({ withTimezone: true, mode: 'string' }), // 承認日時
   approverSub: text(), // 承認者の利用者識別子
@@ -114,13 +114,14 @@ export const request = pgTable('Request', {
 export const auditLog = pgTable('AuditLog', {
   id: uuid().primaryKey().defaultRandom(), // 監査ログID
   requestId: uuid().notNull(), // 対象申請ID
-  action: text().notNull(), // 操作
-  previousStatus: text(), // 操作前の状態
-  newStatus: text(), // 操作後の状態
+  action: text({ enum: ['create', 'update', 'submit', 'withdraw', 'approve', 'reject', 'return', 'delete'] }).notNull(), // 操作
+  previousStatus: text({ enum: ['draft', 'submitted', 'approved', 'rejected', 'withdrawn'] }), // 操作前の状態
+  newStatus: text({ enum: ['draft', 'submitted', 'approved', 'rejected', 'withdrawn'] }), // 操作後の状態
   reason: text(), // 理由
   createdAt: timestamp({ withTimezone: true, mode: 'string' }).notNull(), // 操作日時
   createdBy: text().notNull(), // 操作者の利用者識別子
 }, () => [
+  check('AuditLog_action', sql`"action" in ('create', 'update', 'submit', 'withdraw', 'approve', 'reject', 'return', 'delete')`),
   check('AuditLog_previousStatus', sql`"previousStatus" in ('draft', 'submitted', 'approved', 'rejected', 'withdrawn')`),
   check('AuditLog_newStatus', sql`"newStatus" in ('draft', 'submitted', 'approved', 'rejected', 'withdrawn')`),
 ]);

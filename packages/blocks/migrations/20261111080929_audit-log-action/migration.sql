@@ -1,0 +1,1 @@
+ALTER TABLE "AuditLog" ADD CONSTRAINT "AuditLog_action" CHECK ("action" in ('create', 'update', 'submit', 'withdraw', 'approve', 'reject', 'return', 'delete'));

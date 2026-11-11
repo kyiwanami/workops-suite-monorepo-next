@@ -1,0 +1,42 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "e1b82d9b-b693-472b-8970-ab041e133a08",
+  "prevIds": [
+    "d8cb651e-8679-4f2b-8fd9-ae727f448401"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_check",
+      "statementTarget": [
+        "table",
+        "public",
+        "AuditLog"
+      ],
+      "writes": [
+        "s|ck|public.AuditLog.AuditLog_action",
+        "n|ck|public.AuditLog.AuditLog_action",
+        "e|ck|public.AuditLog.AuditLog_action",
+        "n|con|public.AuditLog.AuditLog_action"
+      ],
+      "reads": [
+        "n|tbl|public.AuditLog",
+        "n|sch|public",
+        "n|col|public.AuditLog.action"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "AuditLog",
+        "name": "AuditLog_action",
+        "value": "\"action\" in ('create', 'update', 'submit', 'withdraw', 'approve', 'reject', 'return', 'delete')",
+        "entityType": "checks"
+      }
+    }
+  ]
+}
