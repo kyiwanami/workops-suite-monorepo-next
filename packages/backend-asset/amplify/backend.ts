@@ -53,6 +53,13 @@ if (process.env.AWS_APP_ID !== undefined) {
       resources: [outputs.custom.database.secretArn],
     }),
   );
+  // 資産の担当者の名前を出すため、共有のユーザープールのユーザーを一覧します。
+  computeRole.addToPolicy(
+    new PolicyStatement({
+      actions: ['cognito-idp:ListUsers'],
+      resources: [userPool.userPoolArn],
+    }),
+  );
 
   // 共有バックエンドの main のデプロイが成功したら、資産カタログのビルドを始めます。
   // 資産カタログは共有バックエンドの出力を読むため、共有バックエンドのデプロイが終わってからビルドします。

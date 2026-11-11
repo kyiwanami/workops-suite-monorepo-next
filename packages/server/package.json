@@ -6,13 +6,15 @@
   "exports": {
     "./user": "./user.ts",
     "./db": "./db.ts",
-    "./app": "./app.ts"
+    "./app": "./app.ts",
+    "./cognito": "./cognito.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@aws-amplify/adapter-nextjs": "1.8.1",
+    "@aws-sdk/client-cognito-identity-provider": "3.1164.0",
     "@aws-sdk/client-rds-data": "3.1164.0",
     "@workops/backend": "*",
     "@workops/blocks": "*",
