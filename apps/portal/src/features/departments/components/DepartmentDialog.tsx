@@ -18,8 +18,8 @@ import { ConfirmButton } from '@workops/ui/workops/confirm-button';
 import { SubmitButton } from '@workops/ui/workops/submit-button';
 import { type ReactNode, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { deleteDepartmentAction, saveDepartmentAction } from '../actions';
-import type { listDepartments } from '../data';
+import { createDepartmentAction, deleteDepartmentAction, updateDepartmentAction } from '../actions';
+import type { DepartmentRow } from '../data';
 import { departmentSchema } from '../schema';
 
 // 部署の登録・編集のフォームです。ダイアログを開くたびに作り直し、部署の今の値から始めます。
@@ -28,23 +28,23 @@ function DepartmentForm({
   department,
   onSaved,
 }: {
-  department: Awaited<ReturnType<typeof listDepartments>>[number] | null;
+  department: DepartmentRow | null;
   onSaved: () => void;
 }) {
   const form = useForm({
     resolver: zodResolver(departmentSchema),
     defaultValues: {
-      id: department?.id ?? '',
       code: department?.code ?? '',
       name: department?.name ?? '',
-      sortOrder: department === null ? '' : String(department.sortOrder),
+      // 表示順の空欄は NaN で表します。
+      sortOrder: department?.sortOrder ?? Number.NaN,
       notes: department?.notes ?? '',
     },
   });
   return (
     <form
       onSubmit={form.handleSubmit(async (values) => {
-        await saveDepartmentAction(values);
+        await (department === null ? createDepartmentAction(values) : updateDepartmentAction(department.id, values));
         onSaved();
       })}
       className="grid gap-6"
@@ -78,7 +78,14 @@ function DepartmentForm({
           render={({ field, fieldState }) => (
             <Field data-invalid={fieldState.invalid}>
               <FieldLabel htmlFor={field.name}>表示順</FieldLabel>
-              <Input {...field} id={field.name} inputMode="numeric" className="font-mono" />
+              <Input
+                {...field}
+                id={field.name}
+                type="number"
+                className="font-mono"
+                value={Number.isNaN(field.value) ? '' : field.value}
+                onChange={(event) => field.onChange(event.target.valueAsNumber)}
+              />
               <FieldError errors={[fieldState.error]} />
             </Field>
           )}
@@ -89,7 +96,7 @@ function DepartmentForm({
           render={({ field }) => (
             <Field>
               <FieldLabel htmlFor={field.name}>備考</FieldLabel>
-              <Textarea {...field} id={field.name} />
+              <Textarea {...field} id={field.name} value={field.value ?? ''} />
             </Field>
           )}
         />
@@ -129,7 +136,7 @@ export function DepartmentDialog({
   department,
   children,
 }: {
-  department: Awaited<ReturnType<typeof listDepartments>>[number] | null;
+  department: DepartmentRow | null;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);

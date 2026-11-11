@@ -24,7 +24,7 @@ export const department = pgTable('Department', {
 export const userMembership = pgTable('UserMembership', {
   sub: text().primaryKey(), // 利用者識別子（Cognito sub）
   departmentId: uuid().notNull().references(() => department.id, { onDelete: 'restrict' }), // 所属部署ID
-  role: text().notNull(), // 業務ロール
+  role: text({ enum: ['viewer', 'editor', 'manager'] }).notNull(), // 業務ロール
   isAdmin: boolean().notNull().default(false), // 全体管理者区分
   ...commonColumns,
 }, () => [check('UserMembership_role', sql`"role" in ('viewer', 'editor', 'manager')`)]);
@@ -48,7 +48,7 @@ export const page = pgTable('Page', {
   description: text(), // 説明
   relativePath: text(), // 相対パス
   iconName: text(), // アイコン
-  role: text(), // 閲覧に必要な最小のロール（未設定は全員）
+  role: text({ enum: ['viewer', 'editor', 'manager'] }), // 閲覧に必要な最小のロール（未設定は全員）
   ...commonColumns,
 }, table => [
   primaryKey({ name: 'Page_pkey', columns: [table.appId, table.pageId] }),

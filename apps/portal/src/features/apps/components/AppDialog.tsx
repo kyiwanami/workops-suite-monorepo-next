@@ -19,12 +19,12 @@ import { SubmitButton } from '@workops/ui/workops/submit-button';
 import { type ReactNode, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { createAppAction, deleteAppAction, updateAppAction } from '../actions';
-import type { listApps } from '../data';
+import type { AppRow } from '../data';
 import { appSchema } from '../schema';
 
 // アプリの登録・編集のフォームです。ダイアログを開くたびに作り直し、アプリの今の値から始めます。編集ではアプリ ID を変えられません。
 // 登録でアプリ ID がすでに使われていたら、アプリ ID の項目にその旨を出します。
-function AppForm({ app, onSaved }: { app: Awaited<ReturnType<typeof listApps>>[number] | null; onSaved: () => void }) {
+function AppForm({ app, onSaved }: { app: AppRow | null; onSaved: () => void }) {
   const form = useForm({
     resolver: zodResolver(appSchema),
     defaultValues: {
@@ -85,7 +85,7 @@ function AppForm({ app, onSaved }: { app: Awaited<ReturnType<typeof listApps>>[n
           render={({ field }) => (
             <Field>
               <FieldLabel htmlFor={field.name}>説明</FieldLabel>
-              <Textarea {...field} id={field.name} />
+              <Textarea {...field} id={field.name} value={field.value ?? ''} />
             </Field>
           )}
         />
@@ -106,7 +106,7 @@ function AppForm({ app, onSaved }: { app: Awaited<ReturnType<typeof listApps>>[n
           render={({ field }) => (
             <Field>
               <FieldLabel htmlFor={field.name}>アイコン</FieldLabel>
-              <Input {...field} id={field.name} className="font-mono" />
+              <Input {...field} id={field.name} className="font-mono" value={field.value ?? ''} />
               <FieldDescription>lucide のアイコン名で入力します（例：package）。</FieldDescription>
             </Field>
           )}
@@ -142,7 +142,7 @@ function AppForm({ app, onSaved }: { app: Awaited<ReturnType<typeof listApps>>[n
 }
 
 // アプリの登録・編集のダイアログです。アプリを渡すと編集、渡さないと登録になります。保存したら閉じます。
-export function AppDialog({ app, children }: { app: Awaited<ReturnType<typeof listApps>>[number] | null; children: ReactNode }) {
+export function AppDialog({ app, children }: { app: AppRow | null; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
     <Dialog open={open} onOpenChange={setOpen}>

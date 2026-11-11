@@ -24,13 +24,11 @@ export async function listDepartments() {
     .orderBy(asc(department.sortOrder), asc(department.code));
 }
 
-// 部署の保存する値です。表示順は数にし、備考は空なら未設定にします。
-const columns = (values: z.infer<typeof departmentSchema>) => ({
-  code: values.code,
-  name: values.name,
-  sortOrder: Number(values.sortOrder),
-  notes: values.notes || null,
-});
+// 部署の一覧の1行の型です。
+export type DepartmentRow = Awaited<ReturnType<typeof listDepartments>>[number];
+
+// 部署の保存する値です。備考は空なら未設定にします。
+const columns = (values: z.infer<typeof departmentSchema>) => ({ ...values, notes: values.notes || null });
 
 // 部署を登録します。作成者・更新者はログイン中の利用者です。
 export async function createDepartment(values: z.infer<typeof departmentSchema>) {
@@ -42,12 +40,12 @@ export async function createDepartment(values: z.infer<typeof departmentSchema>)
 }
 
 // 部署を更新します。更新者はログイン中の利用者です。
-export async function updateDepartment(values: z.infer<typeof departmentSchema>) {
+export async function updateDepartment(id: string, values: z.infer<typeof departmentSchema>) {
   const admin = await getAdmin();
   await db
     .update(department)
     .set({ ...columns(values), updatedAt: new Date().toISOString(), updatedBy: admin.sub })
-    .where(eq(department.id, values.id));
+    .where(eq(department.id, id));
 }
 
 // 部署を削除します。

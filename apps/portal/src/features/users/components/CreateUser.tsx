@@ -20,22 +20,23 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { createUserAction } from '../actions';
+import type { DepartmentOption } from '../data';
 import { userSchema } from '../schema';
 import { DepartmentField } from './DepartmentField';
 import { RoleField } from './RoleField';
 
-// ユーザーの作成フォームです。ダイアログを開くたびに作り直し、空の値から始めます。
+// ユーザーの作成フォームです。ダイアログを開くたびに作り直し、空の値から始めます。ロールは最小の権限の閲覧者から始めます。
 // メールのユーザーがすでにいるときは、メールの項目にその旨を出します。
 function CreateUserForm({
   departments,
   onCreated,
 }: {
-  departments: { id: string; name: string }[];
+  departments: DepartmentOption[];
   onCreated: (output: Awaited<ReturnType<typeof createUserAction>>) => void;
 }) {
   const form = useForm({
     resolver: zodResolver(userSchema),
-    defaultValues: { name: '', email: '', departmentId: '', role: '' },
+    defaultValues: { name: '', email: '', departmentId: '', role: userSchema.shape.role.unwrap().enum.viewer },
   });
   return (
     <form
@@ -98,7 +99,7 @@ function CreateUserForm({
 
 // ユーザーの一覧の題と「ユーザーを作成する」、作成の結果の通知です。
 // 名前・メール・部署・ロールを1つのダイアログで入力し、作成と所属の設定を1回で行います。
-export function CreateUser({ departments }: { departments: { id: string; name: string }[] }) {
+export function CreateUser({ departments }: { departments: DepartmentOption[] }) {
   const [open, setOpen] = useState(false);
   const [created, setCreated] = useState<Awaited<ReturnType<typeof createUserAction>> | null>(null);
   return (

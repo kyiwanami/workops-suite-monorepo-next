@@ -20,8 +20,8 @@ import { SubmitButton } from '@workops/ui/workops/submit-button';
 import { type ReactNode, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { createPageAction, deletePageAction, updatePageAction } from '../actions';
-import type { listApps } from '../data';
-import { pageRoles } from '../labels';
+import type { AppRow } from '../data';
+import { pageRoleLabels } from '../labels';
 import { pageSchema } from '../schema';
 
 // ページの登録・編集のフォームです。ダイアログを開くたびに作り直し、ページの今の値から始めます。編集ではページ ID を変えられません。
@@ -32,7 +32,7 @@ function PageForm({
   onSaved,
 }: {
   appId: string;
-  page: Awaited<ReturnType<typeof listApps>>[number]['pages'][number] | null;
+  page: AppRow['pages'][number] | null;
   onSaved: () => void;
 }) {
   const form = useForm({
@@ -43,8 +43,7 @@ function PageForm({
       name: page?.name ?? '',
       description: page?.description ?? '',
       relativePath: page?.relativePath ?? '',
-      // 必要なロールが未設定のページは、全員が見られるページです。
-      role: pageSchema.shape.role.parse(page?.role ?? 'all'),
+      role: page?.role ?? null,
     },
   });
   return (
@@ -97,7 +96,7 @@ function PageForm({
           render={({ field }) => (
             <Field>
               <FieldLabel htmlFor="pageDescription">説明</FieldLabel>
-              <Textarea {...field} id="pageDescription" />
+              <Textarea {...field} id="pageDescription" value={field.value ?? ''} />
             </Field>
           )}
         />
@@ -107,7 +106,7 @@ function PageForm({
           render={({ field, fieldState }) => (
             <Field data-invalid={fieldState.invalid}>
               <FieldLabel htmlFor={field.name}>相対パス</FieldLabel>
-              <Input {...field} id={field.name} className="font-mono" placeholder="/assets" />
+              <Input {...field} id={field.name} className="font-mono" placeholder="/assets" value={field.value ?? ''} />
               <FieldDescription>/ で始めて入力します。</FieldDescription>
               <FieldError errors={[fieldState.error]} />
             </Field>
@@ -119,12 +118,17 @@ function PageForm({
           render={({ field }) => (
             <FieldSet>
               <FieldLegend variant="label">必要なロール</FieldLegend>
-              <RadioGroup name={field.name} value={field.value} onValueChange={field.onChange}>
-                {pageRoles.map((role) => (
-                  <Field key={role.value} orientation="horizontal">
-                    <RadioGroupItem id={`page-role-${role.value}`} value={role.value} />
-                    <FieldLabel htmlFor={`page-role-${role.value}`} className="font-normal">
-                      {role.label}
+              {/* 必要なロールが未設定のページは全員が見られるため、未設定を「全員」の選択肢で表します。 */}
+              <RadioGroup
+                name={field.name}
+                value={field.value ?? 'all'}
+                onValueChange={(value) => field.onChange(value === 'all' ? null : value)}
+              >
+                {Object.entries(pageRoleLabels).map(([value, label]) => (
+                  <Field key={value} orientation="horizontal">
+                    <RadioGroupItem id={`page-role-${value}`} value={value} />
+                    <FieldLabel htmlFor={`page-role-${value}`} className="font-normal">
+                      {label}
                     </FieldLabel>
                   </Field>
                 ))}
@@ -165,7 +169,7 @@ export function PageDialog({
   children,
 }: {
   appId: string;
-  page: Awaited<ReturnType<typeof listApps>>[number]['pages'][number] | null;
+  page: AppRow['pages'][number] | null;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);

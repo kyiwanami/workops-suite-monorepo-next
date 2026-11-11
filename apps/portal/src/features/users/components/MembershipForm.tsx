@@ -9,6 +9,7 @@ import { SubmitButton } from '@workops/ui/workops/submit-button';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { saveMembershipAction } from '../actions';
+import type { DepartmentOption, UserDetail } from '../data';
 import { membershipSchema } from '../schema';
 import { DepartmentField } from './DepartmentField';
 import { RoleField } from './RoleField';
@@ -21,8 +22,8 @@ export function MembershipForm({
   membership,
 }: {
   sub: string;
-  departments: { id: string; name: string }[];
-  membership: { departmentId: string; role: string; isAdmin: boolean } | null;
+  departments: DepartmentOption[];
+  membership: UserDetail['membership'];
 }) {
   const [saved, setSaved] = useState<boolean | null>(null);
   const form = useForm({
@@ -30,7 +31,7 @@ export function MembershipForm({
     defaultValues: {
       sub,
       departmentId: membership?.departmentId ?? '',
-      role: membership?.role ?? '',
+      role: membership?.role ?? 'viewer',
       isAdmin: membership?.isAdmin ?? false,
     },
   });

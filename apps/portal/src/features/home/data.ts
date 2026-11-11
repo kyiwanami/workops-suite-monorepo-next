@@ -1,11 +1,11 @@
 import 'server-only';
 import { db } from '@workops/server/db';
-import { app, page } from '@workops/blocks/schema';
+import { app, page, type userMembership } from '@workops/blocks/schema';
 import { asc, ne } from 'drizzle-orm';
 import { getMembership } from '@/user';
 
 // ロールの強さの順です。ページの必要なロール以上のロールの利用者に、そのページを見せます。
-const roleRanks: Record<string, number> = { viewer: 1, editor: 2, manager: 3 };
+const roleRanks: Record<typeof userMembership.$inferSelect['role'], number> = { viewer: 1, editor: 2, manager: 3 };
 
 // ホームに並べるアプリと、ログイン中の利用者が使えるページを返します。ポータル自身は含めません。
 // 全体管理者にはすべてのページを、それ以外には必要なロールが未設定か、自分のロール以下のページだけを返します。
