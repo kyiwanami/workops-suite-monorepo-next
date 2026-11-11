@@ -3,6 +3,7 @@
 import { Field, FieldError, FieldLabel } from '@workops/ui/components/field';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@workops/ui/components/select';
 import type { ControllerFieldState } from 'react-hook-form';
+import type { DepartmentOption } from '../data';
 
 // 所属部署の選択です。
 export function DepartmentField({
@@ -11,7 +12,7 @@ export function DepartmentField({
   onChange,
   fieldState,
 }: {
-  departments: { id: string; name: string }[];
+  departments: DepartmentOption[];
   value: string;
   onChange: (value: string) => void;
   fieldState: ControllerFieldState;

@@ -18,7 +18,8 @@ import { notFound } from 'next/navigation';
 import type { z } from 'zod';
 import { cognito, userPoolId } from '@/cognito';
 import { getAdmin } from '@/user';
-import type { membershipSchema, userSchema } from './schema';
+import type { accountStatus, membershipSchema, userSchema } from './schema';
+import type { UserSearchParams } from './search-params';
 
 // 一覧の1ページの件数です。
 export const pageSize = 20;
@@ -36,11 +37,8 @@ const requiredAttribute = (attributes: AttributeType[] | undefined, name: string
   return value;
 };
 
-// アカウントの状態です。招待中は、招待メールを送ったがまだ一度もログインしていない状態です。
-export type AccountStatus = 'invited' | 'active' | 'disabled';
-
 // Cognito のユーザーの有効区分と状態から、アカウントの状態を決めます。
-const accountStatus = (enabled: boolean | undefined, userStatus: string | undefined): AccountStatus => {
+const statusOf = (enabled: boolean | undefined, userStatus: string | undefined): z.infer<typeof accountStatus> => {
   if (enabled === false) {
     return 'disabled';
   }
@@ -72,10 +70,10 @@ async function listCognitoUsers() {
 }
 
 // ユーザーの一覧です。名前・メールの部分一致・部署・状態で絞り込み、メールの昇順で1ページ分を返します。
-export async function listUsers(conditions: { q: string; departmentId: string; status: string; page: number }) {
+export async function listUsers(conditions: UserSearchParams) {
   await getAdmin();
   const [cognitoUsers, memberships] = await Promise.all([listCognitoUsers(), listMemberships()]);
-  const keyword = conditions.q.toLowerCase();
+  const keyword = conditions.q?.toLowerCase();
   const users = cognitoUsers
     .map((user) => {
       const sub = requiredAttribute(user.Attributes, 'sub');
@@ -83,17 +81,17 @@ export async function listUsers(conditions: { q: string; departmentId: string; s
         sub,
         name: attribute(user.Attributes, 'name'),
         email: requiredAttribute(user.Attributes, 'email'),
-        status: accountStatus(user.Enabled, user.UserStatus),
+        status: statusOf(user.Enabled, user.UserStatus),
         membership: memberships.get(sub) ?? null,
       };
     })
     .filter(
       (user) =>
-        (keyword === '' ||
+        (keyword === undefined ||
           user.email.toLowerCase().includes(keyword) ||
           (user.name?.toLowerCase().includes(keyword) ?? false)) &&
-        (conditions.departmentId === '' || user.membership?.departmentId === conditions.departmentId) &&
-        (conditions.status === '' || user.status === conditions.status),
+        (conditions.department === null || user.membership?.departmentId === conditions.department) &&
+        (conditions.status === null || user.status === conditions.status),
     )
     .sort((a, b) => a.email.localeCompare(b.email));
   const start = (conditions.page - 1) * pageSize;
@@ -126,11 +124,20 @@ export async function getUser(sub: string) {
     sub,
     name: attribute(output.UserAttributes, 'name'),
     email: requiredAttribute(output.UserAttributes, 'email'),
-    status: accountStatus(output.Enabled, output.UserStatus),
+    status: statusOf(output.Enabled, output.UserStatus),
     invitedAt: output.UserCreateDate,
     membership: memberships.at(0) ?? null,
   };
 }
+
+// ユーザーの一覧の1行の型です。
+export type UserRow = Awaited<ReturnType<typeof listUsers>>['users'][number];
+
+// 部署の選択肢の1件の型です。
+export type DepartmentOption = Awaited<ReturnType<typeof listDepartmentOptions>>[number];
+
+// ユーザーの詳細の型です。
+export type UserDetail = Awaited<ReturnType<typeof getUser>>;
 
 // 所属（部署・ロール・全体管理者）を登録または更新します。作成者・更新者はログイン中の利用者です。
 export async function saveMembership(values: z.infer<typeof membershipSchema>) {

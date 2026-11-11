@@ -2,13 +2,13 @@ import { Button } from '@workops/ui/components/button';
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@workops/ui/components/card';
 import { Empty, EmptyHeader, EmptyTitle } from '@workops/ui/components/empty';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@workops/ui/components/table';
-import type { listApps } from '../data';
-import { pageRoleLabel } from '../labels';
+import type { AppRow } from '../data';
+import { pageRoleLabels } from '../labels';
 import { AppDialog } from './AppDialog';
 import { PageDialog } from './PageDialog';
 
 // アプリごとに配下のページを並べます。アプリ名・ページ名を押すと編集のダイアログが開きます。
-export function AppList({ apps }: { apps: Awaited<ReturnType<typeof listApps>> }) {
+export function AppList({ apps }: { apps: AppRow[] }) {
   if (apps.length === 0) {
     return (
       <Empty>
@@ -61,7 +61,7 @@ export function AppList({ apps }: { apps: Awaited<ReturnType<typeof listApps>> }
                       </PageDialog>
                     </TableCell>
                     <TableCell className="font-mono">{page.relativePath}</TableCell>
-                    <TableCell>{pageRoleLabel(page.role)}</TableCell>
+                    <TableCell>{pageRoleLabels[page.role ?? 'all']}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

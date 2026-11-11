@@ -1,10 +1,9 @@
-// ページを見るのに必要なロールの選択肢と表示名です。all は全員が見られることを表します。
-export const pageRoles = [
-  { value: 'all', label: '全員' },
-  { value: 'viewer', label: '閲覧者以上' },
-  { value: 'editor', label: '担当者以上' },
-  { value: 'manager', label: '承認者以上' },
-];
+import type { page } from '@workops/blocks/schema';
 
-// ページの必要なロールの値から表示名を引きます。未設定は「全員」です。
-export const pageRoleLabel = (role: string | null) => pageRoles.find((item) => item.value === (role ?? 'all'))?.label;
+// ページを見るのに必要なロールの表示名です。all は必要なロールが未設定で、全員が見られることを表します。
+export const pageRoleLabels: Record<'all' | (typeof page.role.enumValues)[number], string> = {
+  all: '全員',
+  viewer: '閲覧者以上',
+  editor: '担当者以上',
+  manager: '承認者以上',
+};

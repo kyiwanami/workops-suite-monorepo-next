@@ -6,7 +6,7 @@ import { Button } from '@workops/ui/components/button';
 import { Spinner } from '@workops/ui/components/spinner';
 import { type ReactNode, useState, useTransition } from 'react';
 import { deleteUserAction, disableUserAction, enableUserAction, resendInvitationAction } from '../actions';
-import type { AccountStatus } from '../data';
+import type { UserDetail } from '../data';
 
 // ユーザーの詳細の題と、状態に合わせたアカウントの操作です。
 // 招待メールの再送は招待中だけ、削除は無効にした後だけ出します。
@@ -20,7 +20,7 @@ export function AccountActions({
   sub: string;
   email: string;
   displayName: string;
-  status: AccountStatus;
+  status: UserDetail['status'];
   badge: ReactNode;
 }) {
   const [resent, setResent] = useState(false);

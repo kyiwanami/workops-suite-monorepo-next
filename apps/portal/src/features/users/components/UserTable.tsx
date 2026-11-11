@@ -2,13 +2,13 @@ import { Badge } from '@workops/ui/components/badge';
 import { Empty, EmptyHeader, EmptyTitle } from '@workops/ui/components/empty';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@workops/ui/components/table';
 import Link from 'next/link';
-import type { listUsers } from '../data';
+import type { UserRow } from '../data';
 import { roleLabels } from '@workops/ui/lib/roles';
 import { statusBadges } from '../labels';
 
 // ユーザーの一覧表です。名前（未設定ならメール）を押すと詳細を開きます。
 // 所属が未設定の利用者は、部署の列で目立たせます。狭い画面ではメールとロールの列を隠します。
-export function UserTable({ users }: { users: Awaited<ReturnType<typeof listUsers>>['users'] }) {
+export function UserTable({ users }: { users: UserRow[] }) {
   if (users.length === 0) {
     return (
       <Empty>

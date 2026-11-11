@@ -29,6 +29,9 @@ export async function listApps() {
   return apps.map((item) => ({ ...item, pages: pages.filter((child) => child.appId === item.appId) }));
 }
 
+// アプリの一覧の1件の型です。配下のページを含みます。
+export type AppRow = Awaited<ReturnType<typeof listApps>>[number];
+
 // アプリの保存する値です。説明とアイコンは空なら未設定にします。
 const appColumns = (values: z.infer<typeof appSchema>) => ({
   name: values.name,
@@ -64,12 +67,12 @@ export async function deleteApp(appId: string) {
   await db.delete(app).where(eq(app.appId, appId));
 }
 
-// ページの保存する値です。説明と相対パスは空なら未設定にし、必要なロールの all は全員（未設定）にします。
+// ページの保存する値です。説明と相対パスは空なら未設定にします。
 const pageColumns = (values: z.infer<typeof pageSchema>) => ({
   name: values.name,
   description: values.description || null,
   relativePath: values.relativePath || null,
-  role: values.role === 'all' ? null : values.role,
+  role: values.role,
 });
 
 // ページを登録します。作成者・更新者はログイン中の利用者です。ページ ID がすでに使われていたら false を返します。
