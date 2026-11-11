@@ -47,3 +47,13 @@ export const createUserQueries = (
 
   return { getMembership, getEmail };
 };
+
+// ロールの強さの順です。
+const roleRanks: Record<typeof userMembership.$inferSelect['role'], number> = { viewer: 1, editor: 2, manager: 3 };
+
+// 所属が、指定したロール以上かを返します。全体管理者は、どのロールにも当てはまります。
+export const hasRole = (
+  membership: { role: typeof userMembership.$inferSelect['role']; isAdmin: boolean },
+  role: typeof userMembership.$inferSelect['role'],
+) =>
+  membership.isAdmin || roleRanks[membership.role] >= roleRanks[role];

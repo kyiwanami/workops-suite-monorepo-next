@@ -5,18 +5,15 @@ import {
   AdminDisableUserCommand,
   AdminEnableUserCommand,
   AdminGetUserCommand,
-  type AttributeType,
-  paginateListUsers,
-  type UserType,
   UserNotFoundException,
   UsernameExistsException,
 } from '@aws-sdk/client-cognito-identity-provider';
+import { attribute, cognito, listCognitoUsers, requiredAttribute, userPoolId } from '@workops/server/cognito';
 import { db } from '@workops/server/db';
 import { department, userMembership } from '@workops/blocks/schema';
 import { asc, eq } from 'drizzle-orm';
 import { notFound } from 'next/navigation';
 import type { z } from 'zod';
-import { cognito, userPoolId } from '@/cognito';
 import { getAdmin } from '@/user';
 import type { accountStatus, membershipSchema, userSchema } from './schema';
 import type { UserSearchParams } from './search-params';
@@ -24,18 +21,6 @@ import type { UserSearchParams } from './search-params';
 // 一覧の1ページの件数です。
 export const pageSize = 20;
 
-// Cognito のユーザーの属性から、指定した名前の値を取り出します。
-const attribute = (attributes: AttributeType[] | undefined, name: string) =>
-  attributes?.find((item) => item.Name === name)?.Value;
-
-// すべてのユーザーが持つ属性（sub・email）を取り出します。ないときはエラーにします。
-const requiredAttribute = (attributes: AttributeType[] | undefined, name: string) => {
-  const value = attribute(attributes, name);
-  if (value === undefined) {
-    throw new Error(`Cognito のユーザーに ${name} 属性がありません。`);
-  }
-  return value;
-};
 
 // Cognito のユーザーの有効区分と状態から、アカウントの状態を決めます。
 const statusOf = (enabled: boolean | undefined, userStatus: string | undefined): z.infer<typeof accountStatus> => {
@@ -58,15 +43,6 @@ async function listMemberships() {
     .from(userMembership)
     .innerJoin(department, eq(department.id, userMembership.departmentId));
   return new Map(rows.map((row) => [row.sub, row]));
-}
-
-// 共有のユーザープールのユーザーを全件読みます。
-async function listCognitoUsers() {
-  const users: UserType[] = [];
-  for await (const output of paginateListUsers({ client: cognito }, { UserPoolId: userPoolId })) {
-    users.push(...(output.Users ?? []));
-  }
-  return users;
 }
 
 // ユーザーの一覧です。名前・メールの部分一致・部署・状態で絞り込み、メールの昇順で1ページ分を返します。

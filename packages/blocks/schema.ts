@@ -71,7 +71,7 @@ export const asset = pgTable('Asset', {
   departmentId: uuid().notNull().references(() => department.id, { onDelete: 'restrict' }), // 所属部署ID
   name: text().notNull(), // 資産名
   assetTypeId: uuid().notNull().references(() => assetType.id, { onDelete: 'restrict' }), // 資産種別ID
-  status: text().notNull(), // 資産の状態
+  status: text({ enum: ['inStock', 'lent', 'inRepair', 'disposed'] }).notNull(), // 資産の状態
   assigneeSub: text(), // 担当者の利用者識別子
   ...commonColumns,
 }, () => [check('Asset_status', sql`"status" in ('inStock', 'lent', 'inRepair', 'disposed')`)]);
