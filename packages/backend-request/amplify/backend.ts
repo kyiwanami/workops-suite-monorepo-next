@@ -53,6 +53,13 @@ if (process.env.AWS_APP_ID !== undefined) {
       resources: [outputs.custom.database.secretArn],
     }),
   );
+  // 申請者の名前を出すため、共有のユーザープールのユーザーを一覧します。
+  computeRole.addToPolicy(
+    new PolicyStatement({
+      actions: ['cognito-idp:ListUsers'],
+      resources: [userPool.userPoolArn],
+    }),
+  );
 
   // 共有バックエンドの main のデプロイが成功したら、申請管理のビルドを始めます。
   // 申請管理は共有バックエンドの出力を読むため、共有バックエンドのデプロイが終わってからビルドします。
