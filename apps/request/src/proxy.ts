@@ -15,7 +15,8 @@ export async function proxy(request: NextRequest) {
   if (signedIn) {
     return response;
   }
-  return NextResponse.redirect(new URL('/api/auth/sign-in', request.url));
+  // ログイン画面は日本語で表示します。
+  return NextResponse.redirect(new URL('/api/auth/sign-in?lang=ja', request.url));
 }
 
 export const config = {

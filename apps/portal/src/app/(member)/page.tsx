@@ -1,6 +1,14 @@
-import { redirect } from 'next/navigation';
+import { PageHeader } from '@workops/ui/workops/page-header';
+import { AppTiles } from '@/features/home/components/AppTiles';
+import { listHomeApps } from '@/features/home/data';
 
-// アプリの一覧を作るまでは、部署の一覧へ転送します。
-export default function HomePage() {
-  redirect('/admin/departments');
+// ホームです。アプリと、ログイン中の利用者が使えるページを並べます。
+export default async function HomePage() {
+  const apps = await listHomeApps();
+  return (
+    <>
+      <PageHeader title="アプリ" />
+      <AppTiles apps={apps} />
+    </>
+  );
 }

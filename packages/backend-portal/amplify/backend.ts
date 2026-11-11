@@ -53,6 +53,20 @@ if (process.env.AWS_APP_ID !== undefined) {
       resources: [outputs.custom.database.secretArn],
     }),
   );
+  // 全体管理者のユーザー管理で、共有のユーザープールのユーザーを一覧・作成・有効化・無効化・削除します。
+  computeRole.addToPolicy(
+    new PolicyStatement({
+      actions: [
+        'cognito-idp:ListUsers',
+        'cognito-idp:AdminGetUser',
+        'cognito-idp:AdminCreateUser',
+        'cognito-idp:AdminEnableUser',
+        'cognito-idp:AdminDisableUser',
+        'cognito-idp:AdminDeleteUser',
+      ],
+      resources: [userPool.userPoolArn],
+    }),
+  );
 
   // 共有バックエンドの main のデプロイが成功したら、ポータルのビルドを始めます。
   // ポータルは共有バックエンドの出力を読むため、共有バックエンドのデプロイが終わってからビルドします。

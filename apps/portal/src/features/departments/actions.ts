@@ -1,20 +1,23 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { z } from 'zod';
-import { createDepartment } from './data';
+import type { z } from 'zod';
+import { createDepartment, deleteDepartment, updateDepartment } from './data';
+import { departmentSchema } from './schema';
 
-// 部署の登録フォームの入力です。
-const departmentInput = z.object({
-  code: z.string().min(1),
-  name: z.string().min(1),
-  sortOrder: z.coerce.number().int(),
-  notes: z.string(),
-});
+// 入力を検証して部署を登録または更新し、一覧を最新にします。id が空なら登録、あれば更新です。
+export async function saveDepartmentAction(input: z.infer<typeof departmentSchema>) {
+  const values = departmentSchema.parse(input);
+  if (values.id === '') {
+    await createDepartment(values);
+  } else {
+    await updateDepartment(values);
+  }
+  revalidatePath('/admin/departments');
+}
 
-// 入力を検証して部署を登録し、一覧を最新にします。
-export async function createDepartmentAction(formData: FormData) {
-  const input = departmentInput.parse(Object.fromEntries(formData));
-  await createDepartment({ ...input, notes: input.notes === '' ? null : input.notes });
+// 部署を削除し、一覧を最新にします。
+export async function deleteDepartmentAction(formData: FormData) {
+  await deleteDepartment(String(formData.get('id')));
   revalidatePath('/admin/departments');
 }
