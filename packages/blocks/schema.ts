@@ -48,8 +48,12 @@ export const page = pgTable('Page', {
   description: text(), // 説明
   relativePath: text(), // 相対パス
   iconName: text(), // アイコン
+  role: text(), // 閲覧に必要な最小のロール（未設定は全員）
   ...commonColumns,
-}, table => [primaryKey({ name: 'Page_pkey', columns: [table.appId, table.pageId] })]);
+}, table => [
+  primaryKey({ name: 'Page_pkey', columns: [table.appId, table.pageId] }),
+  check('Page_role', sql`"role" in ('viewer', 'editor', 'manager')`),
+]);
 
 // 資産種別
 export const assetType = pgTable('AssetType', {

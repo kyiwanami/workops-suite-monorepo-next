@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@workops/ui/components/dropdown-menu';
 import { useTheme } from 'next-themes';
+import { useNavItems } from './app-nav';
 
 // アバターから開くユーザーメニューです。利用者と所属・ロールの表示、狭い画面でのアプリの切替、テーマの切替、ログアウトを置きます。
 export function UserMenu({
@@ -21,13 +22,16 @@ export function UserMenu({
   affiliation,
   apps,
   currentAppId,
+  adminUrl,
 }: {
   email: string | undefined;
   affiliation: string | null;
   apps: { appId: string; name: string; urlDomain: string }[];
   currentAppId: string;
+  adminUrl: string | null;
 }) {
   const { theme, setTheme } = useTheme();
+  const items = useNavItems(apps, currentAppId, adminUrl);
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="ml-auto rounded-full md:ml-0">
@@ -43,13 +47,9 @@ export function UserMenu({
         </DropdownMenuLabel>
         <DropdownMenuGroup className="md:hidden">
           <DropdownMenuSeparator />
-          {apps.map((app) => (
-            <DropdownMenuItem
-              key={app.appId}
-              asChild
-              className={cn('min-h-11 font-bold', app.appId === currentAppId && 'text-primary')}
-            >
-              <a href={app.urlDomain}>{app.name}</a>
+          {items.map((item) => (
+            <DropdownMenuItem key={item.key} asChild className={cn('min-h-11 font-bold', item.current && 'text-primary')}>
+              <a href={item.href}>{item.name}</a>
             </DropdownMenuItem>
           ))}
         </DropdownMenuGroup>

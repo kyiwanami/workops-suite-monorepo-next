@@ -1,0 +1,76 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "d8cb651e-8679-4f2b-8fd9-ae727f448401",
+  "prevIds": [
+    "867c0f15-d2c8-46d4-9fe2-95add3c83a74"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "Page",
+        "role"
+      ],
+      "writes": [
+        "s|col|public.Page.role",
+        "n|col|public.Page.role",
+        "e|col|public.Page.role"
+      ],
+      "reads": [
+        "n|tbl|public.Page",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "add_check",
+      "statementTarget": [
+        "table",
+        "public",
+        "Page"
+      ],
+      "writes": [
+        "s|ck|public.Page.Page_role",
+        "n|ck|public.Page.Page_role",
+        "e|ck|public.Page.Page_role",
+        "n|con|public.Page.Page_role"
+      ],
+      "reads": [
+        "n|tbl|public.Page",
+        "n|sch|public",
+        "n|col|public.Page.role"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "Page",
+        "name": "role",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "Page",
+        "name": "Page_role",
+        "value": "\"role\" in ('viewer', 'editor', 'manager')",
+        "entityType": "checks"
+      }
+    }
+  ]
+}
