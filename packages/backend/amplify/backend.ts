@@ -1,10 +1,8 @@
-import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { defineBackend } from '@aws-amplify/backend';
 import { createBlocksBackend } from '@workops/blocks/cdk';
-import { CfnResource, Duration, Stack } from 'aws-cdk-lib';
+import { Stack } from 'aws-cdk-lib';
 import {
-  CfnUserPoolClient,
   FeaturePlan,
   LambdaVersion,
   ManagedLoginVersion,
@@ -14,10 +12,13 @@ import {
   UserPoolOperation,
 } from 'aws-cdk-lib/aws-cognito';
 import { PolicyStatement } from 'aws-cdk-lib/aws-iam';
+import { createAiBackend } from './ai';
+import { gatewayInterceptor } from './functions/gateway-interceptor/resource';
 import { preTokenGeneration } from './functions/pre-token-generation/resource';
-import { mcpClientProviders } from './mcp-clients';
+import { synchronizeGatewayTarget } from './functions/synchronize-gateway-target/resource';
+import { waitGatewayTarget } from './functions/wait-gateway-target/resource';
 
-const app = defineBackend({ preTokenGeneration });
+const app = defineBackend({ preTokenGeneration, gatewayInterceptor, synchronizeGatewayTarget, waitGatewayTarget });
 
 // Blocks の Aurora と、デプロイ時に Drizzle のマイグレーションを適用する仕組みを構築します。
 const database = await createBlocksBackend(app.createStack('blocks'));
@@ -40,18 +41,14 @@ userPool.addDomain('LoginDomain', {
   managedLoginVersion: ManagedLoginVersion.NEWER_MANAGED_LOGIN,
 });
 
-// AIの機能のトークンに付けるスコープです。宛先ごとにトークンを分けます。
+// チャットの経路のトークンに付けるスコープです。
 const chatScope = new ResourceServerScope({
   scopeName: 'chat',
   scopeDescription: 'チャットAPIと、チャットから業務のツールを呼ぶGateway',
 });
-const mcpScope = new ResourceServerScope({
-  scopeName: 'mcp',
-  scopeDescription: '外部のMCPクライアントから業務のツールを呼ぶGateway',
-});
 const resourceServer = userPool.addResourceServer('ResourceServer', {
   identifier: 'workops',
-  scopes: [chatScope, mcpScope],
+  scopes: [chatScope],
 });
 
 // トークンを作る前に、利用者のロールと全体管理者区分をアクセストークンに入れます。所属は共有の Aurora から読みます。
@@ -70,49 +67,27 @@ userPool.addTrigger(
   LambdaVersion.V2_0,
 );
 
-// 外部のMCPクライアント（Claude Code・Codex など）がログインするクライアントです。
-// クライアントは自分のメタデータ文書の URL を ID として名乗り、戻り先はその文書の redirect_uris から取られます。
-// 認可コードのフローには戻り先の登録が要るため、手元で動くクライアントの戻り先（任意のポート）を登録します。
-const mcpClient = userPool.addClient('McpClient', {
-  generateSecret: false,
-  oAuth: {
-    flows: { authorizationCodeGrant: true },
-    scopes: [OAuthScope.resourceServer(resourceServer, mcpScope)],
-    callbackUrls: ['http://localhost'],
-  },
-  refreshTokenRotationGracePeriod: Duration.seconds(10),
-  preventUserExistenceErrors: true,
-});
+// Gateway のインターセプターが、トークンを検証するためのユーザープールです。
+app.gatewayInterceptor.addEnvironment('USER_POOL_ID', userPool.userPoolId);
 
-// メタデータ文書で名乗ることを認める MCP クライアントを、提供元ごとに外部のMCPクライアント用のクライアントへ紐づけます。
-// aws-cdk-lib にこのリソースの型がないため、CloudFormation のリソースを直接書きます。
-// クライアント側の文書の変更に早く追従するため、文書を保持する時間は最小の1日にします。
-for (const provider of mcpClientProviders) {
-  new CfnResource(stack, `CimdPolicy-${provider.name}`, {
-    type: 'AWS::Cognito::CIMDPolicy',
-    properties: {
-      UserPoolId: userPool.userPoolId,
-      ClientId: mcpClient.userPoolClientId,
-      PolicyName: provider.name,
-      URLPatterns: provider.urls,
-      CacheDuration: Duration.days(1).toSeconds(),
-    },
-  });
-}
-
-// チャットの経路で、Webアプリのトークンを Gateway 用のトークンに交換するクライアントです。
-// 交換で発行できるのは元のトークンにあるスコープだけのため、Webアプリと同じ workops/chat を持たせます。
-const tokenExchangeClient = userPool.addClient('TokenExchangeClient', {
-  generateSecret: true,
-  oAuth: { flows: { clientCredentials: true }, scopes: [OAuthScope.resourceServer(resourceServer, chatScope)] },
-  accessTokenValidity: Duration.minutes(60),
+// AI機能のスタックです。Gateway のインターセプターと同じスタックに置きます。
+const { gatewayUrl } = createAiBackend({
+  stack: Stack.of(app.gatewayInterceptor.resources.lambda),
+  userPool,
+  chatScope: OAuthScope.resourceServer(resourceServer, chatScope),
+  cluster: database.cluster,
+  databaseName: database.databaseName,
+  gatewayInterceptor: app.gatewayInterceptor.resources.lambda,
+  synchronizeGatewayTarget: app.synchronizeGatewayTarget.resources.lambda,
+  waitGatewayTarget: app.waitGatewayTarget.resources.lambda,
 });
-const tokenExchangeClientResource = tokenExchangeClient.node.defaultChild;
-assert(tokenExchangeClientResource instanceof CfnUserPoolClient);
-tokenExchangeClientResource.explicitAuthFlows = ['ALLOW_TOKEN_EXCHANGE_IMPERSONATION'];
 
 // 各アプリがクライアントを作るときと、サーバー側の処理で読む値です。
 app.addOutput({
   auth: { aws_region: stack.region, user_pool_id: userPool.userPoolId },
-  custom: { database, authDomain: `workops-${prefix}.auth.${stack.region}.amazoncognito.com` },
+  custom: {
+    database: { clusterArn: database.clusterArn, secretArn: database.secretArn, databaseName: database.databaseName },
+    authDomain: `workops-${prefix}.auth.${stack.region}.amazoncognito.com`,
+    gatewayUrl,
+  },
 });

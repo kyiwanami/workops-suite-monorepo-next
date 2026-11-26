@@ -5,7 +5,7 @@ import type { Context } from './context';
 import { BusinessError } from './errors';
 import { hasRole, type Membership } from './membership';
 import { listUsers } from './users';
-import type { AssetConditions, assetSchema } from '@workops/schema/assets';
+import type { AssetConditions, AssetDetail, AssetList, assetSchema, AssetTypeOption } from '@workops/schema/assets';
 
 // 一覧の1ページの件数です。
 export const pageSize = 20;
@@ -14,7 +14,7 @@ export const pageSize = 20;
 const departmentScope = (member: Membership) => (member.isAdmin ? undefined : eq(asset.departmentId, member.departmentId));
 
 // 資産種別の選択肢です。表示順・コードの順で返します。
-export async function listAssetTypeOptions(context: Context) {
+export async function listAssetTypeOptions(context: Context): Promise<AssetTypeOption[]> {
   return context.db
     .select({ id: assetType.id, name: assetType.name })
     .from(assetType)
@@ -41,7 +41,7 @@ export async function listMembers(context: Context, departmentIds: string[]) {
 
 // 資産の一覧です。名称または担当者の名前・メールの部分一致・状態・種別・部署で絞り込み、更新日時の新しい順で1ページ分を返します。
 // 部署の絞り込みは全体管理者だけに効きます。種別名・部署名・担当者の名前を一緒に返します。
-export async function listAssets(context: Context, conditions: AssetConditions) {
+export async function listAssets(context: Context, conditions: AssetConditions): Promise<AssetList> {
   const { db, member } = context;
   const users = await listUsers(context);
   const keyword = conditions.q?.toLowerCase();
@@ -89,7 +89,7 @@ export async function listAssets(context: Context, conditions: AssetConditions) 
 }
 
 // 資産の詳細です。扱える部署の資産でなければ null を返します。種別名と担当者の名前を一緒に返します。
-export async function getAsset(context: Context, id: string) {
+export async function getAsset(context: Context, id: string): Promise<AssetDetail | null> {
   if (!z.uuid().safeParse(id).success) {
     return null;
   }

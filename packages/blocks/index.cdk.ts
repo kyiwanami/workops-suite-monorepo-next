@@ -44,6 +44,6 @@ export async function createBlocksBackend(root: Stack) {
     properties: { migrations: migrations.layerVersionArn },
   });
 
-  // Blocksが生成するDB接続先とSecretの参照を共有します。
-  return { clusterArn: db.clusterArn, secretArn: db.secret.secretArn, databaseName };
+  // Blocksが生成するDBと、その接続先とSecretの参照を共有します。DBは、ほかの関数にData APIの権限を付けるときに使います。
+  return { cluster: db, clusterArn: db.clusterArn, secretArn: db.secret.secretArn, databaseName };
 }

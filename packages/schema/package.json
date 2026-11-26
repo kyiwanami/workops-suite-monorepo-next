@@ -10,8 +10,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@workops/blocks": "*",
-    "drizzle-orm": "1.0.0-rc.5",
     "zod": "4.6.7"
   }
 }

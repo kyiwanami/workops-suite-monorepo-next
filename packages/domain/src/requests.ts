@@ -6,7 +6,14 @@ import type { Context } from './context';
 import { BusinessError } from './errors';
 import { hasRole, type Membership } from './membership';
 import { listUsers } from './users';
-import type { RequestConditions, requestSchema } from '@workops/schema/requests';
+import type {
+  RequestConditions,
+  RequestDetail,
+  RequestList,
+  RequestOperations,
+  requestSchema,
+  RequestTypeOption,
+} from '@workops/schema/requests';
 
 // 一覧の1ページの件数です。
 export const pageSize = 20;
@@ -44,7 +51,10 @@ async function userNames(context: Context) {
 }
 
 // 申請種別の選択肢です。表示順・コードの順で返します。作成・編集では有効な種別だけを選べます。
-export async function listRequestTypeOptions(context: Context, activeOnly: boolean) {
+export async function listRequestTypeOptions(
+  context: Context,
+  activeOnly: boolean,
+): Promise<RequestTypeOption[]> {
   return context.db
     .select({ id: requestType.id, name: requestType.name })
     .from(requestType)
@@ -55,7 +65,7 @@ export async function listRequestTypeOptions(context: Context, activeOnly: boole
 // 申請の一覧です。タブ・件名または申請者の名前・メールの部分一致・種別・期間・部署で絞り込み、1ページ分を返します。
 // 「自分が承認するもの」は承認者以上だけが使え、提出日時の古い順に並べます。それ以外は更新日時の新しい順です。
 // 部署の絞り込みは全体管理者だけに効きます。3つのタブの件数と、承認のタブを使えるかと、種別名・部署名・申請者の名前を一緒に返します。
-export async function listRequests(context: Context, conditions: RequestConditions) {
+export async function listRequests(context: Context, conditions: RequestConditions): Promise<RequestList> {
   const { db, member } = context;
   const users = await listUsers(context);
   const names = new Map(users.map((user) => [user.sub, user.name]));
@@ -119,12 +129,30 @@ export async function listRequests(context: Context, conditions: RequestConditio
 }
 
 // 申請の詳細です。扱える部署の申請でなければ null を返します。種別名・部署名・申請者の名前を一緒に返します。
-export async function getRequest(context: Context, id: string) {
+export async function getRequest(context: Context, id: string): Promise<RequestDetail | null> {
   if (!z.uuid().safeParse(id).success) {
     return null;
   }
   const rows = await context.db
-    .select({ request, requestTypeName: requestType.name, departmentName: department.name })
+    .select({
+      id: request.id,
+      title: request.title,
+      description: request.description,
+      amount: request.amount,
+      status: request.status,
+      requestTypeId: request.requestTypeId,
+      requestTypeName: requestType.name,
+      departmentName: department.name,
+      requesterSub: request.requesterSub,
+      createdAt: request.createdAt,
+      submittedAt: request.submittedAt,
+      approvedAt: request.approvedAt,
+      rejectedAt: request.rejectedAt,
+      rejectionReason: request.rejectionReason,
+      withdrawnAt: request.withdrawnAt,
+      returnedAt: request.returnedAt,
+      returnReason: request.returnReason,
+    })
     .from(request)
     .innerJoin(requestType, eq(requestType.id, request.requestTypeId))
     .innerJoin(department, eq(department.id, request.departmentId))
@@ -134,16 +162,11 @@ export async function getRequest(context: Context, id: string) {
     return null;
   }
   const names = await userNames(context);
-  return {
-    ...row.request,
-    requestTypeName: row.requestTypeName,
-    departmentName: row.departmentName,
-    requesterName: names.get(row.request.requesterSub) ?? null,
-  };
+  return { ...row, requesterName: names.get(row.requesterSub) ?? null };
 }
 
 // 利用者が申請にできる操作です。状態遷移表・ロール・本人条件で決まり、全体管理者にも本人条件と自己承認の禁止を適用します。
-export function getOperations(member: Membership, target: { requesterSub: string; status: Status }) {
+export function getOperations(member: Membership, target: { requesterSub: string; status: Status }): RequestOperations {
   const own = target.requesterSub === member.sub;
   const editor = hasRole(member, 'editor');
   const approver = hasRole(member, 'manager') && !own && target.status === 'submitted';
@@ -158,8 +181,6 @@ export function getOperations(member: Membership, target: { requesterSub: string
   };
 }
 
-// 申請にできる操作の型です。
-export type Operations = ReturnType<typeof getOperations>;
 
 // 申請種別が存在して有効であることを確かめます。
 async function checkRequestType(context: Context, id: string) {
@@ -177,7 +198,7 @@ async function checkRequestType(context: Context, id: string) {
 async function operate(
   context: Context,
   id: string,
-  operation: keyof Operations,
+  operation: keyof RequestOperations,
   newStatus: Status | null,
   values: (now: string) => PgUpdateSetSource<typeof request>,
   reason: string | null,
