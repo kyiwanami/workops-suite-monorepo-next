@@ -1,7 +1,7 @@
 import 'server-only';
 import type { createServerRunner } from '@aws-amplify/adapter-nextjs';
 import * as membership from '@workops/domain/membership';
-import { fetchUserAttributes, getCurrentUser } from 'aws-amplify/auth/server';
+import { fetchAuthSession, getCurrentUser } from 'aws-amplify/auth/server';
 import { cookies } from 'next/headers';
 import { cache } from 'react';
 import { db } from './db';
@@ -21,13 +21,14 @@ export const createUserQueries = (
   // ログイン中の利用者の所属・部署名・ロール・全体管理者区分です。所属が未設定ならnullを返します。
   const getMembership = cache(async () => membership.getMembership(db, (await getUser()).userId));
 
-  // ログイン中の利用者のメールです。
+  // ログイン中の利用者のメールです。IDトークンの email から取ります。
   const getEmail = cache(async () => {
-    const attributes = await runWithAmplifyServerContext({
+    const session = await runWithAmplifyServerContext({
       nextServerContext: { cookies },
-      operation: (contextSpec) => fetchUserAttributes(contextSpec),
+      operation: (contextSpec) => fetchAuthSession(contextSpec),
     });
-    return attributes.email;
+    const email = session.tokens?.idToken?.payload.email;
+    return typeof email === 'string' ? email : undefined;
   });
 
   return { getMembership, getEmail };

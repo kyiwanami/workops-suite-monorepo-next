@@ -13,7 +13,7 @@ const origin =
     : `https://${process.env.AWS_BRANCH}.${process.env.AWS_APP_ID}.amplifyapp.com`;
 const signInUrl = `${origin}/api/auth/sign-in-callback`;
 const signOutUrl = `${origin}/api/auth/sign-out-callback`;
-const scopes = [OAuthScope.OPENID, OAuthScope.EMAIL, OAuthScope.PROFILE, OAuthScope.COGNITO_ADMIN];
+const scopes = [OAuthScope.OPENID, OAuthScope.EMAIL, OAuthScope.PROFILE, OAuthScope.custom('workops/chat')];
 
 const app = defineBackend({});
 const stack = app.createStack('auth');
