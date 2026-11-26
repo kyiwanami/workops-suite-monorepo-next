@@ -17,8 +17,8 @@ import { Textarea } from '@workops/ui/components/textarea';
 import { SubmitButton } from '@workops/ui/workops/submit-button';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { rejectRequestAction, returnRequestAction } from '../actions';
-import { reasonSchema } from '../schema';
+import { rejectRequestAction, returnRequestAction } from '@/server/requests/actions';
+import { reasonSchema } from '@workops/schema/requests';
 import { OperationError } from './OperationError';
 
 // 却下・差戻しの文言です。確認の本文には操作の結果を書きます。

@@ -18,8 +18,8 @@ import { ConfirmButton } from '@workops/ui/workops/confirm-button';
 import { SubmitButton } from '@workops/ui/workops/submit-button';
 import { type ReactNode, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { createDepartmentAction, deleteDepartmentAction, updateDepartmentAction } from '../actions';
-import type { DepartmentRow } from '../data';
+import { createDepartmentAction, deleteDepartmentAction, updateDepartmentAction } from '@/server/departments/actions';
+import type { DepartmentRow } from '@/server/departments/data';
 import { departmentSchema } from '../schema';
 
 // 部署の登録・編集のフォームです。ダイアログを開くたびに作り直し、部署の今の値から始めます。

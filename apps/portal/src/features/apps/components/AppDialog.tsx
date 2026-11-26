@@ -18,8 +18,8 @@ import { ConfirmButton } from '@workops/ui/workops/confirm-button';
 import { SubmitButton } from '@workops/ui/workops/submit-button';
 import { type ReactNode, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { createAppAction, deleteAppAction, updateAppAction } from '../actions';
-import type { AppRow } from '../data';
+import { createAppAction, deleteAppAction, updateAppAction } from '@/server/apps/actions';
+import type { AppRow } from '@/server/apps/data';
 import { appSchema } from '../schema';
 
 // アプリの登録・編集のフォームです。ダイアログを開くたびに作り直し、アプリの今の値から始めます。編集ではアプリ ID を変えられません。

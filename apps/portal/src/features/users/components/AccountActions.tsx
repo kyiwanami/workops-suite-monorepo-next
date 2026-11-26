@@ -5,8 +5,8 @@ import { ConfirmButton } from '@workops/ui/workops/confirm-button';
 import { Button } from '@workops/ui/components/button';
 import { Spinner } from '@workops/ui/components/spinner';
 import { type ReactNode, useState, useTransition } from 'react';
-import { deleteUserAction, disableUserAction, enableUserAction, resendInvitationAction } from '../actions';
-import type { UserDetail } from '../data';
+import { deleteUserAction, disableUserAction, enableUserAction, resendInvitationAction } from '@/server/users/actions';
+import type { UserDetail } from '@/server/users/data';
 
 // ユーザーの詳細の題と、状態に合わせたアカウントの操作です。
 // 招待メールの再送は招待中だけ、削除は無効にした後だけ出します。

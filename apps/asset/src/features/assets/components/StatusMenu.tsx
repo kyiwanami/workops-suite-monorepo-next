@@ -9,9 +9,9 @@ import {
   DropdownMenuTrigger,
 } from '@workops/ui/components/dropdown-menu';
 import { ChevronDown } from 'lucide-react';
-import type { AssetRow } from '../data';
+import type { AssetRow } from '@/server/assets/data';
 import { statusBadges } from '../labels';
-import { assetStatus } from '../schema';
+import { assetStatus } from '@workops/schema/assets';
 
 // 資産の状態のバッジです。変更できる人には、矢印付きのバッジを押して状態を選ぶメニューにします。選んだ状態を onChange に渡します。
 export function StatusMenu({

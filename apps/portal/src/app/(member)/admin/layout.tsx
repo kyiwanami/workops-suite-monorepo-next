@@ -1,4 +1,4 @@
-import { getAdmin } from '@/user';
+import { getAdmin } from '@/server/user';
 import type { ReactNode } from 'react';
 import { AdminTabs } from './admin-tabs';
 

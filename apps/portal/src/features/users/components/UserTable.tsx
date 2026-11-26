@@ -2,7 +2,7 @@ import { Badge } from '@workops/ui/components/badge';
 import { Empty, EmptyHeader, EmptyTitle } from '@workops/ui/components/empty';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@workops/ui/components/table';
 import Link from 'next/link';
-import type { UserRow } from '../data';
+import type { UserRow } from '@/server/users/data';
 import { roleLabels } from '@workops/ui/lib/roles';
 import { statusBadges } from '../labels';
 

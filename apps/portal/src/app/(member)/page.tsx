@@ -1,6 +1,6 @@
 import { PageHeader } from '@workops/ui/workops/page-header';
 import { AppTiles } from '@/features/home/components/AppTiles';
-import { listHomeApps } from '@/features/home/data';
+import { listHomeApps } from '@/server/home/data';
 
 // ホームです。アプリと、ログイン中の利用者が使えるページを並べます。
 export default async function HomePage() {

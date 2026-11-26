@@ -1,3 +1,4 @@
+import { getOperations } from '@workops/domain/requests';
 import { Alert, AlertDescription, AlertTitle } from '@workops/ui/components/alert';
 import { Badge } from '@workops/ui/components/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@workops/ui/components/card';
@@ -5,13 +6,13 @@ import { ConfirmButton } from '@workops/ui/workops/confirm-button';
 import { PageHeader } from '@workops/ui/workops/page-header';
 import { CircleX, CornerUpLeft } from 'lucide-react';
 import Link from 'next/link';
-import { approveRequestAction, deleteRequestAction, withdrawRequestAction } from '@/features/requests/actions';
+import { approveRequestAction, deleteRequestAction, withdrawRequestAction } from '@/server/requests/actions';
 import { ActionBar } from '@/features/requests/components/ActionBar';
 import { ReasonDialog } from '@/features/requests/components/ReasonDialog';
 import { RequestForm } from '@/features/requests/components/RequestForm';
-import { getOperations, getRequest, listRequestTypeOptions } from '@/features/requests/data';
+import { getRequest, listRequestTypeOptions } from '@/server/requests/data';
 import { formatAmount, formatDateTime, statusBadges } from '@/features/requests/labels';
-import { getMember } from '@/user';
+import { getMember } from '@/server/user';
 
 // 申請の詳細です。状態・ロール・本人条件に応じて操作を出し分けます。
 // 本人の下書きは入力欄で出し、その場で直して提出できます。承認者には他者の提出済みの申請に「却下」「差戻し」「承認」を出します。

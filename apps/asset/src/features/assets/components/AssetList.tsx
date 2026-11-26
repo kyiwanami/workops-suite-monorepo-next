@@ -6,8 +6,8 @@ import { Empty, EmptyHeader, EmptyTitle } from '@workops/ui/components/empty';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@workops/ui/components/table';
 import Link from 'next/link';
 import { type ReactNode, useState, useTransition } from 'react';
-import { changeStatusAction } from '../actions';
-import type { AssetRow } from '../data';
+import { changeStatusAction } from '@/server/assets/actions';
+import type { AssetRow } from '@/server/assets/data';
 import { formatDateTime, statusBadges } from '../labels';
 import { StatusMenu } from './StatusMenu';
 

@@ -1,6 +1,6 @@
 import { Empty, EmptyHeader, EmptyTitle } from '@workops/ui/components/empty';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@workops/ui/components/table';
-import type { DepartmentRow } from '../data';
+import type { DepartmentRow } from '@/server/departments/data';
 import { DepartmentDialog } from './DepartmentDialog';
 
 // 部署の一覧表です。部署名を押すと編集のダイアログが開きます。

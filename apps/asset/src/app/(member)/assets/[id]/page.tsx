@@ -2,13 +2,13 @@ import { Badge } from '@workops/ui/components/badge';
 import { Card, CardContent } from '@workops/ui/components/card';
 import { ConfirmButton } from '@workops/ui/workops/confirm-button';
 import { PageHeader } from '@workops/ui/workops/page-header';
-import { hasRole } from '@workops/server/user';
+import { hasRole } from '@workops/domain/membership';
 import Link from 'next/link';
-import { deleteAssetAction } from '@/features/assets/actions';
+import { deleteAssetAction } from '@/server/assets/actions';
 import { AssetForm } from '@/features/assets/components/AssetForm';
-import { getAsset, listAssetTypeOptions, listMembers } from '@/features/assets/data';
+import { getAsset, listAssetTypeOptions, listMembers } from '@/server/assets/data';
 import { formatDateTime, statusBadges } from '@/features/assets/labels';
-import { getMember } from '@/user';
+import { getMember } from '@/server/user';
 
 // 資産の詳細です。編集できる人には最初から入力欄で、閲覧者には読み取り専用で出します。削除は承認者以上だけに出します。
 export default async function AssetPage({ params }: { params: Promise<{ id: string }> }) {

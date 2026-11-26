@@ -3,7 +3,7 @@ import { Card, CardContent } from '@workops/ui/components/card';
 import { Empty, EmptyHeader, EmptyTitle } from '@workops/ui/components/empty';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@workops/ui/components/table';
 import Link from 'next/link';
-import type { RequestRow } from '../data';
+import type { RequestRow } from '@/server/requests/data';
 import { formatAmount, formatDateTime, statusBadges } from '../labels';
 
 // 提出日時の表示です。未提出は「—」です。

@@ -8,8 +8,8 @@ import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel } from '@
 import { SubmitButton } from '@workops/ui/workops/submit-button';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { saveMembershipAction } from '../actions';
-import type { DepartmentOption, UserDetail } from '../data';
+import { saveMembershipAction } from '@/server/users/actions';
+import type { DepartmentOption, UserDetail } from '@/server/users/data';
 import { membershipSchema } from '../schema';
 import { DepartmentField } from './DepartmentField';
 import { RoleField } from './RoleField';

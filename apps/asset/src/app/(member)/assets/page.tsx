@@ -1,15 +1,15 @@
 import { Alert, AlertTitle } from '@workops/ui/components/alert';
 import { Button } from '@workops/ui/components/button';
 import { PageHeader } from '@workops/ui/workops/page-header';
-import { hasRole } from '@workops/server/user';
+import { hasRole } from '@workops/domain/membership';
 import Link from 'next/link';
 import type { SearchParams } from 'nuqs/server';
 import { AssetFilters } from '@/features/assets/components/AssetFilters';
 import { AssetList } from '@/features/assets/components/AssetList';
 import { AssetPagination } from '@/features/assets/components/AssetPagination';
-import { listAssets, listAssetTypeOptions, listDepartmentOptions } from '@/features/assets/data';
+import { listAssets, listAssetTypeOptions, listDepartmentOptions } from '@/server/assets/data';
 import { loadAssetSearchParams } from '@/features/assets/search-params';
-import { getMember } from '@/user';
+import { getMember } from '@/server/user';
 
 // 資産の一覧です。名称・担当者で検索し、状態・種別（全体管理者は部署も）で絞り込みます。
 // 資産を保存して戻ったときは、題の下に保存した旨を出します。

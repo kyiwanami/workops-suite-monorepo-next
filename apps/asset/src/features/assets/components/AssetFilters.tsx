@@ -3,9 +3,9 @@
 import { Input } from '@workops/ui/components/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@workops/ui/components/select';
 import { useQueryStates } from 'nuqs';
-import type { Option } from '../data';
+import type { Option } from '@/server/assets/data';
 import { statusBadges } from '../labels';
-import { assetStatus } from '../schema';
+import { assetStatus } from '@workops/schema/assets';
 import { assetSearchParams } from '../search-params';
 
 // 「すべて」を表す選択肢の値です。Select は空の値を選択肢にできないため、この値で表します。

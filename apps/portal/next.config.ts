@@ -2,7 +2,7 @@ import type { NextConfig } from 'next';
 
 // モノレポ内のTypeScriptのパッケージを、このアプリのビルドで変換します。
 const nextConfig: NextConfig = {
-  transpilePackages: ['@workops/ui', '@workops/server', '@workops/blocks'],
+  transpilePackages: ['@workops/ui', '@workops/server', '@workops/blocks', '@workops/domain'],
 };
 
 export default nextConfig;

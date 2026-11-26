@@ -18,9 +18,9 @@ import { ConfirmButton } from '@workops/ui/workops/confirm-button';
 import { SubmitButton } from '@workops/ui/workops/submit-button';
 import { type ReactNode, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { createRequestTypeAction, deleteRequestTypeAction, updateRequestTypeAction } from '../actions';
-import type { RequestTypeRow } from '../data';
-import { requestTypeSchema } from '../schema';
+import { createRequestTypeAction, deleteRequestTypeAction, updateRequestTypeAction } from '@/server/request-types/actions';
+import type { RequestTypeRow } from '@/server/request-types/data';
+import { requestTypeSchema } from '@workops/schema/request-types';
 
 // 申請種別の登録・編集のフォームです。ダイアログを開くたびに作り直し、種別の今の値から始めます。コードも編集できます。
 // 申請が使っている種別は削除できないため、件数を書き、削除を出しません。

@@ -3,7 +3,7 @@
 import { Field, FieldError, FieldLabel } from '@workops/ui/components/field';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@workops/ui/components/select';
 import type { ControllerFieldState } from 'react-hook-form';
-import type { DepartmentOption } from '../data';
+import type { DepartmentOption } from '@/server/users/data';
 
 // 所属部署の選択です。
 export function DepartmentField({

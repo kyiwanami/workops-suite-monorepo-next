@@ -3,7 +3,7 @@
 import { Input } from '@workops/ui/components/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@workops/ui/components/select';
 import { useQueryStates } from 'nuqs';
-import type { DepartmentOption } from '../data';
+import type { DepartmentOption } from '@/server/users/data';
 import { statusBadges } from '../labels';
 import { accountStatus } from '../schema';
 import { userSearchParams } from '../search-params';

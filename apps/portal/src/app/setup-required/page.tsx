@@ -1,6 +1,6 @@
 import { Button } from '@workops/ui/components/button';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from '@workops/ui/components/empty';
-import { getEmail } from '@/user';
+import { getEmail } from '@/server/user';
 
 // 部署・ロールが未設定の利用者に、全体管理者による設定が必要なことと、次の行動を伝えます。
 // 別のアカウントの取り違えに気づけるよう、ログイン中のメールを出します。

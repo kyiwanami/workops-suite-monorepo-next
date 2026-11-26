@@ -1,12 +1,12 @@
 import { Badge } from '@workops/ui/components/badge';
 import { PageHeader } from '@workops/ui/workops/page-header';
-import { hasRole } from '@workops/server/user';
+import { hasRole } from '@workops/domain/membership';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { RequestForm } from '@/features/requests/components/RequestForm';
-import { listRequestTypeOptions } from '@/features/requests/data';
+import { listRequestTypeOptions } from '@/server/requests/data';
 import { statusBadges } from '@/features/requests/labels';
-import { getMember } from '@/user';
+import { getMember } from '@/server/user';
 
 // 申請の作成です。担当者以上だけが開けます。種別は有効なものだけを選べます。
 export default async function NewRequestPage() {

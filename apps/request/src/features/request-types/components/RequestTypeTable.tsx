@@ -1,7 +1,7 @@
 import { Badge } from '@workops/ui/components/badge';
 import { Empty, EmptyHeader, EmptyTitle } from '@workops/ui/components/empty';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@workops/ui/components/table';
-import type { RequestTypeRow } from '../data';
+import type { RequestTypeRow } from '@/server/request-types/data';
 import { RequestTypeDialog } from './RequestTypeDialog';
 
 // 申請種別の一覧表です。種別名を押すと編集のダイアログが開きます。有効区分は表示だけです。

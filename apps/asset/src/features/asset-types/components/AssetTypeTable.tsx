@@ -1,6 +1,6 @@
 import { Empty, EmptyHeader, EmptyTitle } from '@workops/ui/components/empty';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@workops/ui/components/table';
-import type { AssetTypeRow } from '../data';
+import type { AssetTypeRow } from '@/server/asset-types/data';
 import { AssetTypeDialog } from './AssetTypeDialog';
 
 // 資産種別の一覧表です。種別名を押すと編集のダイアログが開きます。

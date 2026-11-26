@@ -1,4 +1,4 @@
-import { createAuthRouteHandlers } from '@/auth';
+import { createAuthRouteHandlers } from '@/server/auth';
 
 // マネージドログインでのサインイン・サインアウトと、その戻り先を処理します。
 export const GET = createAuthRouteHandlers({

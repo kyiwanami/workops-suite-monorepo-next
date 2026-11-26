@@ -2,7 +2,7 @@ import { Button } from '@workops/ui/components/button';
 import { PageHeader } from '@workops/ui/workops/page-header';
 import { AppDialog } from '@/features/apps/components/AppDialog';
 import { AppList } from '@/features/apps/components/AppList';
-import { listApps } from '@/features/apps/data';
+import { listApps } from '@/server/apps/data';
 
 // アプリと配下のページの一覧と、登録・編集・削除です。
 export default async function AppsPage() {

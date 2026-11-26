@@ -3,7 +3,7 @@ import { CreateUser } from '@/features/users/components/CreateUser';
 import { UserFilters } from '@/features/users/components/UserFilters';
 import { UserPagination } from '@/features/users/components/UserPagination';
 import { UserTable } from '@/features/users/components/UserTable';
-import { listDepartmentOptions, listUsers } from '@/features/users/data';
+import { listDepartmentOptions, listUsers } from '@/server/users/data';
 import { loadUserSearchParams } from '@/features/users/search-params';
 
 // ユーザーの一覧です。名前・メールで検索し、部署と状態で絞り込みます。

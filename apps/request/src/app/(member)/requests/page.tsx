@@ -1,15 +1,15 @@
 import { Alert, AlertTitle } from '@workops/ui/components/alert';
 import { Button } from '@workops/ui/components/button';
 import { PageHeader } from '@workops/ui/workops/page-header';
-import { hasRole } from '@workops/server/user';
+import { hasRole } from '@workops/domain/membership';
 import Link from 'next/link';
 import type { SearchParams } from 'nuqs/server';
 import { RequestFilters } from '@/features/requests/components/RequestFilters';
 import { RequestList } from '@/features/requests/components/RequestList';
 import { RequestPagination } from '@/features/requests/components/RequestPagination';
-import { listDepartmentOptions, listRequests, listRequestTypeOptions } from '@/features/requests/data';
+import { listDepartmentOptions, listRequests, listRequestTypeOptions } from '@/server/requests/data';
 import { loadRequestSearchParams } from '@/features/requests/search-params';
-import { getMember } from '@/user';
+import { getMember } from '@/server/user';
 
 // 申請の一覧です。タブで「すべて」「自分が承認するもの」「自分の申請」を切り替え、件名・申請者で検索し、種別・期間（全体管理者は部署も）で絞り込みます。
 // 申請を保存・操作して戻ったときは、題の下に保存した旨を出します。

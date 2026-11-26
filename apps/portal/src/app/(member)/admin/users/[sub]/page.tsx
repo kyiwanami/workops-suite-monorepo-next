@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@workops/ui/components
 import Link from 'next/link';
 import { AccountActions } from '@/features/users/components/AccountActions';
 import { MembershipForm } from '@/features/users/components/MembershipForm';
-import { getUser, listDepartmentOptions } from '@/features/users/data';
+import { getUser, listDepartmentOptions } from '@/server/users/data';
 import { statusBadges } from '@/features/users/labels';
 
 // 日時を「2026/11/10 14:30」の形にします。

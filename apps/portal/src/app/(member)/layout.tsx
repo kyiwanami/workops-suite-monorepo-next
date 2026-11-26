@@ -1,4 +1,4 @@
-import { getMembership } from '@/user';
+import { getMembership } from '@/server/user';
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 

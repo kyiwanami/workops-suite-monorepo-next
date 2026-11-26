@@ -4,9 +4,10 @@ import { Badge } from '@workops/ui/components/badge';
 import { Input } from '@workops/ui/components/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@workops/ui/components/select';
 import { Tabs, TabsList, TabsTrigger } from '@workops/ui/components/tabs';
+import { requestPeriods, requestTabs } from '@workops/schema/requests';
 import { useQueryStates } from 'nuqs';
-import type { listRequests, Option } from '../data';
-import { requestPeriods, requestSearchParams, requestTabs } from '../search-params';
+import type { listRequests, Option } from '@/server/requests/data';
+import { requestSearchParams } from '../search-params';
 
 // 「すべて」を表す選択肢の値です。Select は空の値を選択肢にできないため、この値で表します。
 const all = 'all';

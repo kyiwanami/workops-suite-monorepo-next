@@ -2,7 +2,7 @@ import { Button } from '@workops/ui/components/button';
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@workops/ui/components/card';
 import { Empty, EmptyHeader, EmptyTitle } from '@workops/ui/components/empty';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@workops/ui/components/table';
-import type { AppRow } from '../data';
+import type { AppRow } from '@/server/apps/data';
 import { pageRoleLabels } from '../labels';
 import { AppDialog } from './AppDialog';
 import { PageDialog } from './PageDialog';

@@ -19,8 +19,8 @@ import { ConfirmButton } from '@workops/ui/workops/confirm-button';
 import { SubmitButton } from '@workops/ui/workops/submit-button';
 import { type ReactNode, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { createPageAction, deletePageAction, updatePageAction } from '../actions';
-import type { AppRow } from '../data';
+import { createPageAction, deletePageAction, updatePageAction } from '@/server/apps/actions';
+import type { AppRow } from '@/server/apps/data';
 import { pageRoleLabels } from '../labels';
 import { pageSchema } from '../schema';
 

@@ -17,10 +17,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { SubmitButton } from '@workops/ui/workops/submit-button';
 import Link from 'next/link';
 import { Controller, useForm, useWatch } from 'react-hook-form';
-import { createAssetAction, updateAssetAction } from '../actions';
-import type { AssetDetail, Member, Option } from '../data';
+import { createAssetAction, updateAssetAction } from '@/server/assets/actions';
+import type { AssetDetail, Member, Option } from '@/server/assets/data';
 import { formatDateTime, statusBadges } from '../labels';
-import { assetSchema, assetStatus } from '../schema';
+import { assetSchema, assetStatus } from '@workops/schema/assets';
 import { AssigneeField } from './AssigneeField';
 
 // 資産の登録・編集のフォームです。資産を渡すと編集、渡さないと登録になります。

@@ -7,12 +7,7 @@ import {
   parseAsString,
   parseAsStringLiteral,
 } from 'nuqs/server';
-
-// 申請の一覧のタブです。すべて・自分が承認するもの・自分の申請です。
-export const requestTabs = ['all', 'approve', 'mine'] as const;
-
-// 申請の一覧の期間です。作成日時が今月・先月のもの、またはすべてです。
-export const requestPeriods = ['thisMonth', 'lastMonth', 'all'] as const;
+import { requestPeriods, requestTabs } from '@workops/schema/requests';
 
 // 申請の一覧の検索条件です。URL に持ち、画面とサーバーの両方で同じ形で読み書きします。
 // saved は、申請を保存・操作して一覧へ戻ったことを表します。

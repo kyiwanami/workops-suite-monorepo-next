@@ -14,6 +14,8 @@
     "@hookform/resolvers": "7.0.5",
     "@workops/backend-asset": "*",
     "@workops/blocks": "*",
+    "@workops/domain": "*",
+    "@workops/schema": "*",
     "@workops/server": "*",
     "@workops/ui": "*",
     "aws-amplify": "6.22.2",

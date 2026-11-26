@@ -2,7 +2,7 @@ import { Button } from '@workops/ui/components/button';
 import { PageHeader } from '@workops/ui/workops/page-header';
 import { AssetTypeDialog } from '@/features/asset-types/components/AssetTypeDialog';
 import { AssetTypeTable } from '@/features/asset-types/components/AssetTypeTable';
-import { listAssetTypes } from '@/features/asset-types/data';
+import { listAssetTypes } from '@/server/asset-types/data';
 
 // 全部署共通の資産種別の一覧と、登録・編集・削除です。承認者以上だけが開けます。
 export default async function AssetTypesPage() {

@@ -1,6 +1,6 @@
 import { Empty, EmptyHeader, EmptyTitle } from '@workops/ui/components/empty';
 import { ExternalLink } from 'lucide-react';
-import type { listHomeApps } from '../data';
+import type { listHomeApps } from '@/server/home/data';
 import { AppIcon } from './AppIcon';
 
 // アプリごとのタイルです。上部を押すとアプリを、下に並ぶページの行を押すとそのページを、別タブで開きます。

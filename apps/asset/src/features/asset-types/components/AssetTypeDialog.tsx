@@ -18,9 +18,9 @@ import { ConfirmButton } from '@workops/ui/workops/confirm-button';
 import { SubmitButton } from '@workops/ui/workops/submit-button';
 import { type ReactNode, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { createAssetTypeAction, deleteAssetTypeAction, updateAssetTypeAction } from '../actions';
-import type { AssetTypeRow } from '../data';
-import { assetTypeSchema } from '../schema';
+import { createAssetTypeAction, deleteAssetTypeAction, updateAssetTypeAction } from '@/server/asset-types/actions';
+import type { AssetTypeRow } from '@/server/asset-types/data';
+import { assetTypeSchema } from '@workops/schema/asset-types';
 
 // 資産種別の登録・編集のフォームです。ダイアログを開くたびに作り直し、種別の今の値から始めます。編集ではコードを変えられません。
 // 登録でコードがすでに使われていたら、コードの項目にその旨を出します。資産がある種別は削除できないため、件数と変更の場所を書きます。
