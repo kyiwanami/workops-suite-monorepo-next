@@ -13,3 +13,6 @@ tmp
 # Next.js
 .next
 next-env.d.ts
+
+# 手元の開発サーバーの起動設定
+.claude/launch.json
