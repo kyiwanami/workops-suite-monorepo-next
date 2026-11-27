@@ -7,7 +7,9 @@
     "./user": "./user.ts",
     "./db": "./db.ts",
     "./app": "./app.ts",
-    "./cognito": "./cognito.ts"
+    "./cognito": "./cognito.ts",
+    "./chat": "./chat.ts",
+    "./security-headers": "./security-headers.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
@@ -15,11 +17,13 @@
   "dependencies": {
     "@aws-amplify/adapter-nextjs": "1.8.1",
     "@aws-sdk/client-cognito-identity-provider": "3.1164.0",
+    "@nosecone/next": "1.16.0",
     "@workops/backend": "*",
     "@workops/blocks": "*",
     "@workops/domain": "*",
     "aws-amplify": "6.22.2",
     "drizzle-orm": "1.0.0-rc.5",
+    "nosecone": "1.16.0",
     "server-only": "0.0.1"
   },
   "peerDependencies": {

@@ -8,7 +8,7 @@ import Link from 'next/link';
 import { type ReactNode, useState, useTransition } from 'react';
 import { changeStatusAction } from '@/server/assets/actions';
 import type { AssetRow } from '@/server/assets/data';
-import { formatDateTime, statusBadges } from '../labels';
+import { formatDateTime, assetStatusBadges } from '@workops/ui/lib/labels';
 import { StatusMenu } from './StatusMenu';
 
 // 資産の一覧です。広い画面は表、狭い画面は Card を並べます。名称を押すと詳細を開きます。
@@ -45,7 +45,7 @@ export function AssetList({
       {changed !== null && (
         <Alert variant="success">
           <AlertTitle>
-            状態を{statusBadges[changed.from].label}から{statusBadges[changed.to].label}に変更しました
+            状態を{assetStatusBadges[changed.from].label}から{assetStatusBadges[changed.to].label}に変更しました
           </AlertTitle>
         </Alert>
       )}

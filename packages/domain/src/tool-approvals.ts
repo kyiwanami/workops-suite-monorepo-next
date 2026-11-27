@@ -2,17 +2,9 @@ import { toolApproval } from '@workops/blocks/schema';
 import { and, eq, inArray, TransactionRollbackError } from 'drizzle-orm';
 import type { AwsDataApiPgDatabase } from 'drizzle-orm/aws-data-api/pg';
 
-// 確認カードを表示したことを記録します。依頼した利用者を作成者・更新者にします。
-export async function recordToolRequests(
-  db: AwsDataApiPgDatabase,
-  sub: string,
-  requests: Array<{ toolUseId: string; conversationId: string; toolName: string; input: (typeof toolApproval.$inferInsert)['input'] }>,
-) {
-  const now = new Date().toISOString();
-  await db
-    .insert(toolApproval)
-    .values(requests.map((request) => ({ ...request, status: 'requested' as const, createdAt: now, createdBy: sub, updatedAt: now, updatedBy: sub })))
-    .onConflictDoNothing();
+// 確認カードを表示したことを、表示した時点の対象の値と一緒に記録します。同じツール呼び出しは最初の1回だけ記録します。
+export async function recordToolRequests(db: AwsDataApiPgDatabase, requests: Array<typeof toolApproval.$inferInsert>) {
+  await db.insert(toolApproval).values(requests).onConflictDoNothing();
 }
 
 // 確認カードの判断を記録します。1つの応答の判断をまとめて記録し、状態が requested の行だけを更新します。
@@ -63,9 +55,10 @@ export async function recordToolResult(db: AwsDataApiPgDatabase, sub: string, to
 }
 
 // 会話の確認カードの記録を返します。依頼した利用者本人の記録だけを返します。
+// 対象の値は確認カードの「変更前」に、更新日時は実行の結果の日時に使います。
 export async function listToolApprovals(db: AwsDataApiPgDatabase, sub: string, conversationId: string) {
   return db
-    .select({ toolUseId: toolApproval.toolUseId, status: toolApproval.status })
+    .select()
     .from(toolApproval)
     .where(and(eq(toolApproval.conversationId, conversationId), eq(toolApproval.createdBy, sub)));
 }

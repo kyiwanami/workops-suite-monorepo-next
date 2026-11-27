@@ -1,4 +1,5 @@
 import '@workops/ui/globals.css';
+import { nonce } from '@nosecone/next';
 import { ThemeProvider } from '@workops/ui/workops/theme-provider';
 import { BIZ_UDGothic, BIZ_UDPGothic } from 'next/font/google';
 import { NuqsAdapter } from 'nuqs/adapters/next/app';
@@ -10,12 +11,14 @@ const bizUdpGothic = BIZ_UDPGothic({ subsets: ['latin'], weight: ['400', '700'],
 const bizUdGothic = BIZ_UDGothic({ subsets: ['latin'], weight: ['400', '700'], variable: '--font-biz-udgothic' });
 
 // ポータルの全画面に共通の枠です。共通のヘッダーを上に置き、ヘッダーの読み込みを待たずに本文の読み込み中の表示を出し、検索条件を URL で扱えるようにします。
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  // proxy.ts が要求ごとに作った CSP の nonce です。
+  const scriptNonce = await nonce();
   return (
     <html lang="ja" className={`${bizUdpGothic.variable} ${bizUdGothic.variable} font-sans`} suppressHydrationWarning>
       <body>
         <NuqsAdapter>
-          <ThemeProvider>
+          <ThemeProvider nonce={scriptNonce}>
             <Suspense>
               <Header />
             </Suspense>

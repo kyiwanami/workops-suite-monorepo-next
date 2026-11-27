@@ -4,7 +4,7 @@ import { Empty, EmptyHeader, EmptyTitle } from '@workops/ui/components/empty';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@workops/ui/components/table';
 import Link from 'next/link';
 import type { RequestRow } from '@/server/requests/data';
-import { formatAmount, formatDateTime, statusBadges } from '../labels';
+import { formatAmount, formatDateTime, requestStatusBadges } from '@workops/ui/lib/labels';
 
 // 提出日時の表示です。未提出は「—」です。
 const submittedAt = (item: RequestRow) => (item.submittedAt === null ? '—' : formatDateTime(item.submittedAt));
@@ -48,7 +48,7 @@ export function RequestList({ requests, showDepartment }: { requests: RequestRow
                 <TableCell>{item.requestTypeName}</TableCell>
                 <TableCell>{item.requesterName}</TableCell>
                 <TableCell>
-                  <Badge variant={statusBadges[item.status].variant}>{statusBadges[item.status].label}</Badge>
+                  <Badge variant={requestStatusBadges[item.status].variant}>{requestStatusBadges[item.status].label}</Badge>
                 </TableCell>
                 <TableCell className="text-right font-mono tabular-nums">{formatAmount(item.amount)}</TableCell>
                 <TableCell className="font-mono tabular-nums">{submittedAt(item)}</TableCell>
@@ -64,7 +64,7 @@ export function RequestList({ requests, showDepartment }: { requests: RequestRow
               <CardContent className="grid gap-2 px-4">
                 <div className="flex items-start justify-between gap-3">
                   <span className="font-bold text-primary">{item.title}</span>
-                  <Badge variant={statusBadges[item.status].variant}>{statusBadges[item.status].label}</Badge>
+                  <Badge variant={requestStatusBadges[item.status].variant}>{requestStatusBadges[item.status].label}</Badge>
                 </div>
                 <div className="flex flex-wrap justify-between gap-x-4 gap-y-1 text-sm text-muted-foreground">
                   <span>

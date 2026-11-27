@@ -11,7 +11,7 @@ import { ActionBar } from '@/features/requests/components/ActionBar';
 import { ReasonDialog } from '@/features/requests/components/ReasonDialog';
 import { RequestForm } from '@/features/requests/components/RequestForm';
 import { getRequest, listRequestTypeOptions } from '@/server/requests/data';
-import { formatAmount, formatDateTime, statusBadges } from '@/features/requests/labels';
+import { formatAmount, formatDateTime, requestStatusBadges } from '@workops/ui/lib/labels';
 import { getMember } from '@/server/user';
 
 // 申請の詳細です。状態・ロール・本人条件に応じて操作を出し分けます。
@@ -22,7 +22,7 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
   const [member, request] = await Promise.all([getMember(), getRequest(id)]);
   const operations = getOperations(member, request);
   const requestTypes = operations.update ? await listRequestTypeOptions(true) : [];
-  const badge = statusBadges[request.status];
+  const badge = requestStatusBadges[request.status];
   // 経過です。値のある日時だけを、時刻の順に並べます。
   const history = [
     { label: '作成', at: request.createdAt },

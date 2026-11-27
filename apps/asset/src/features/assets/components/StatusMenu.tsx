@@ -10,7 +10,7 @@ import {
 } from '@workops/ui/components/dropdown-menu';
 import { ChevronDown } from 'lucide-react';
 import type { AssetRow } from '@/server/assets/data';
-import { statusBadges } from '../labels';
+import { assetStatusBadges } from '@workops/ui/lib/labels';
 import { assetStatus } from '@workops/schema/assets';
 
 // 資産の状態のバッジです。変更できる人には、矢印付きのバッジを押して状態を選ぶメニューにします。選んだ状態を onChange に渡します。
@@ -25,7 +25,7 @@ export function StatusMenu({
   disabled: boolean;
   onChange: (status: AssetRow['status']) => void;
 }) {
-  const badge = statusBadges[status];
+  const badge = assetStatusBadges[status];
   if (!editable) {
     return <Badge variant={badge.variant}>{badge.label}</Badge>;
   }
@@ -49,7 +49,7 @@ export function StatusMenu({
         >
           {assetStatus.options.map((value) => (
             <DropdownMenuRadioItem key={value} value={value}>
-              {statusBadges[value].label}
+              {assetStatusBadges[value].label}
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>

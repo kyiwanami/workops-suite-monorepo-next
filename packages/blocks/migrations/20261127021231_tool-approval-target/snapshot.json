@@ -1,0 +1,47 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "5c79961b-4031-4d45-98c3-28db79b18da5",
+  "prevIds": [
+    "96664f33-3ec2-4051-ae60-4f1873a4f150"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "ToolApproval",
+        "target"
+      ],
+      "writes": [
+        "s|col|public.ToolApproval.target",
+        "n|col|public.ToolApproval.target",
+        "e|col|public.ToolApproval.target"
+      ],
+      "reads": [
+        "n|tbl|public.ToolApproval",
+        "n|sch|public"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "ToolApproval",
+        "name": "target",
+        "type": "jsonb",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    }
+  ]
+}

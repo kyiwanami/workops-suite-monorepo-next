@@ -130,11 +130,14 @@ export const auditLog = pgTable('AuditLog', {
 // AIチャットの書込みツールの呼び出し（確認カード）ごとに、表示から判断・実行結果までの状態を記録します。
 // 判断は状態が requested の行だけを更新して受け付け、同じ呼び出しへの判断を最初の1回だけ受け付けます。
 // createdAt・createdByに確認カードを表示した日時と依頼した利用者、updatedAt・updatedByに最後に状態を更新した日時と利用者を記録します。
+// target には、確認カードの「変更前」と、履歴で同じ確認カードを出すために、表示した時点の対象の値を残します。
 export const toolApproval = pgTable('ToolApproval', {
   toolUseId: text().primaryKey(), // ツール呼び出しのID
   conversationId: uuid().notNull(), // 会話のID
   toolName: text().notNull(), // ツール名
   input: jsonb().notNull(), // ツール呼び出しの入力
   status: text({ enum: ['requested', 'approved', 'denied', 'succeeded', 'failed', 'abandoned', 'expired'] }).notNull(), // 状態
+  target: jsonb(), // 確認カードを表示した時点の対象の値（読み取りツールの結果）。対象のない新規作成のツールでは空
+  names: jsonb(), // 確認カードの入力の ID の項目の名前（読み取りツールで引いた値）。ID の項目がないツールでは空
   ...commonColumns,
 }, () => [check('ToolApproval_status', sql`"status" in ('requested', 'approved', 'denied', 'succeeded', 'failed', 'abandoned', 'expired')`)]);

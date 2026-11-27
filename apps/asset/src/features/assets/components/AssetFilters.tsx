@@ -4,7 +4,7 @@ import { Input } from '@workops/ui/components/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@workops/ui/components/select';
 import { useQueryStates } from 'nuqs';
 import type { Option } from '@/server/assets/data';
-import { statusBadges } from '../labels';
+import { assetStatusBadges } from '@workops/ui/lib/labels';
 import { assetStatus } from '@workops/schema/assets';
 import { assetSearchParams } from '../search-params';
 
@@ -38,7 +38,7 @@ export function AssetFilters({ assetTypes, departments }: { assetTypes: Option[]
           <SelectItem value={all}>状態：すべて</SelectItem>
           {assetStatus.options.map((value) => (
             <SelectItem key={value} value={value}>
-              状態：{statusBadges[value].label}
+              状態：{assetStatusBadges[value].label}
             </SelectItem>
           ))}
         </SelectContent>

@@ -9,6 +9,8 @@ const tools = {
     'list-assets', // 資産の一覧
     'get-asset', // 資産の詳細
     'list-asset-types', // 資産種別の一覧
+    'list-departments', // 部署の一覧
+    'list-members', // 担当者の候補の一覧
     'list-requests', // 申請の一覧
     'get-request', // 申請の詳細
     'list-request-types', // 申請種別の一覧

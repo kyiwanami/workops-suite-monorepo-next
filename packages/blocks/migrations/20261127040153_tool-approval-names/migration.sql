@@ -1,0 +1,1 @@
+ALTER TABLE "ToolApproval" ADD COLUMN "names" jsonb;

@@ -1,6 +1,15 @@
 import { env } from '$amplify/env/chat';
-import { BedrockAgentCoreClient, type Event, type HarnessMessage, paginateListEvents, paginateListSessions } from '@aws-sdk/client-bedrock-agentcore';
+import {
+  BedrockAgentCoreClient,
+  type Event,
+  type HarnessMessage,
+  type HarnessToolResultBlock,
+  type HarnessToolUseBlock,
+  paginateListEvents,
+  paginateListSessions,
+} from '@aws-sdk/client-bedrock-agentcore';
 import type { JSONObject } from '@ai-sdk/provider';
+import type { toolApproval } from '@workops/blocks/schema';
 import type { UIMessage } from 'ai';
 import { z } from 'zod';
 
@@ -59,6 +68,7 @@ export function toMessages(events: Event[]): HarnessMessage[] {
     .flatMap((event) => event.payload ?? [])
     .flatMap((payload) => {
       const text = payload.conversational?.content?.text;
+      // 発話でないイベントは飛ばす
       return text === undefined ? [] : [recordSchema.parse(JSON.parse(text)).message];
     });
 }
@@ -68,6 +78,7 @@ export function toMessages(events: Event[]): HarnessMessage[] {
 export function pendingToolUses(messages: HarnessMessage[]) {
   const answered = new Set(messages.flatMap((message) => message.content ?? []).flatMap((block) => block.toolResult?.toolUseId ?? []));
   const last = messages.findLast((message) => message.role === 'assistant');
+  // 文などと、結果のある呼び出しは除く
   return (last?.content ?? []).flatMap(({ toolUse }) =>
     toolUse?.toolUseId === undefined || toolUse.name === undefined || answered.has(toolUse.toolUseId)
       ? []
@@ -76,19 +87,24 @@ export function pendingToolUses(messages: HarnessMessage[]) {
 }
 
 // 会話の発話を、画面の AI SDK のメッセージにします。利用者の依頼のあとのAIの発話とツールの結果は、1つのAIのメッセージにまとめます。
-// ツールの部品には、ツールの情報（MCP の表示名と注釈）を付けます。
-// 結果のないツールの呼び出しは承認の要求の状態に、確認カードの判断の記録で取り消したものは取り消しの状態にします。
-export function toUIMessages(messages: HarnessMessage[], metadata: Map<string, JSONObject>, denied: Set<string>) {
+export function toUIMessages(
+  messages: HarnessMessage[],
+  metadata: Map<string, JSONObject>,
+  approvals: Map<string, typeof toolApproval.$inferSelect>,
+  readTools: Set<string>,
+) {
   const results = new Map(
     messages.flatMap((message) => message.content ?? []).flatMap((block) => (block.toolResult?.toolUseId === undefined ? [] : [[block.toolResult.toolUseId, block.toolResult]])),
   );
   const uiMessages: UIMessage[] = [];
   messages.forEach((message, index) => {
     const content = message.content ?? [];
+    // 利用者の依頼
     if (message.role === 'user' && content.some((block) => block.text !== undefined)) {
       uiMessages.push({ id: `${index}`, role: 'user', parts: content.flatMap((block) => (block.text === undefined ? [] : [{ type: 'text', text: block.text }])) });
       return;
     }
+    // AIの発話とツールの結果は、直前のAIのメッセージにまとめる
     const last = uiMessages.at(-1);
     const assistant: UIMessage = last?.role === 'assistant' ? last : { id: `${index}`, role: 'assistant', parts: [] };
     if (assistant !== last) {
@@ -97,23 +113,73 @@ export function toUIMessages(messages: HarnessMessage[], metadata: Map<string, J
     for (const block of content) {
       if (block.text !== undefined) {
         assistant.parts.push({ type: 'text', text: block.text });
-      } else if (block.toolUse?.toolUseId !== undefined && block.toolUse.name !== undefined) {
-        const { toolUseId, name, input } = block.toolUse;
-        const result = results.get(toolUseId);
-        const output = (result?.content ?? []).map((item) => item.text ?? JSON.stringify(item.json)).join('');
-        const toolMetadata = metadata.get(name);
-        const common = { type: 'dynamic-tool', toolCallId: toolUseId, toolName: name, input, ...(toolMetadata === undefined ? {} : { toolMetadata }) } as const;
-        assistant.parts.push(
-          result === undefined
-            ? { ...common, state: 'approval-requested', approval: { id: toolUseId } }
-            : denied.has(toolUseId)
-              ? { ...common, state: 'output-denied', approval: { id: toolUseId, approved: false } }
-              : result.status === 'error'
-                ? { ...common, state: 'output-error', errorText: output }
-                : { ...common, state: 'output-available', output },
-        );
+      }
+      // ツールの結果は呼び出しの部品に入れる
+      if (block.toolUse !== undefined) {
+        pushToolParts(assistant, block.toolUse, { results, approvals, metadata, readTools });
       }
     }
   });
   return uiMessages;
+}
+
+// ツールの呼び出しを部品にして足す。状態はツールの結果と確認カードの記録で決める
+function pushToolParts(
+  assistant: UIMessage,
+  toolUse: HarnessToolUseBlock,
+  history: {
+    results: Map<string, HarnessToolResultBlock>;
+    approvals: Map<string, typeof toolApproval.$inferSelect>;
+    metadata: Map<string, JSONObject>;
+    readTools: Set<string>;
+  },
+) {
+  const { toolUseId, name, input } = toolUse;
+  // ID か名前がなければ飛ばす
+  if (toolUseId === undefined || name === undefined) {
+    return;
+  }
+  const result = history.results.get(toolUseId);
+  const approval = history.approvals.get(toolUseId);
+  const toolMetadata = history.metadata.get(name);
+  const common = {
+    toolCallId: toolUseId,
+    toolName: name,
+    input,
+    // 読み取りのツールは確認カードにしない
+    providerExecuted: history.readTools.has(name),
+    ...(toolMetadata === undefined ? {} : { toolMetadata }),
+  };
+  const output = (result?.content ?? []).map((item) => item.text ?? JSON.stringify(item.json)).join('');
+  const status = approval?.status;
+  if (result === undefined) {
+    // 判断待ち
+    assistant.parts.push({ type: 'dynamic-tool', ...common, state: 'approval-requested', approval: { id: toolUseId } });
+  } else if (status === 'denied' || status === 'abandoned') {
+    // やめた・判断せずに次の依頼をした
+    assistant.parts.push({ type: 'dynamic-tool', ...common, state: 'output-denied', approval: { id: toolUseId, approved: false } });
+  } else if (status === 'failed' || result.status === 'error') {
+    // 失敗
+    assistant.parts.push({ type: 'dynamic-tool', ...common, state: 'output-error', errorText: output });
+  } else {
+    // 成功
+    assistant.parts.push({ type: 'dynamic-tool', ...common, state: 'output-available', output });
+  }
+
+  // 記録がない（読み取りのツール）
+  if (approval === undefined) {
+    return;
+  }
+  // 変更前の表示に使う対象の値
+  if (approval.target !== null) {
+    assistant.parts.push({ type: 'data-target', id: toolUseId, data: approval.target });
+  }
+  // ID の代わりに出す名前
+  if (approval.names !== null) {
+    assistant.parts.push({ type: 'data-names', id: toolUseId, data: approval.names });
+  }
+  // 実行を終えたカードの日時
+  if (status === 'succeeded' || status === 'failed') {
+    assistant.parts.push({ type: 'data-result', id: toolUseId, data: { at: approval.updatedAt } });
+  }
 }

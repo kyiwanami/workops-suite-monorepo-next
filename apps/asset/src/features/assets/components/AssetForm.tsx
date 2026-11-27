@@ -19,7 +19,7 @@ import Link from 'next/link';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { createAssetAction, updateAssetAction } from '@/server/assets/actions';
 import type { AssetDetail, Member, Option } from '@/server/assets/data';
-import { formatDateTime, statusBadges } from '../labels';
+import { formatDateTime, assetStatusBadges } from '@workops/ui/lib/labels';
 import { assetSchema, assetStatus } from '@workops/schema/assets';
 import { AssigneeField } from './AssigneeField';
 
@@ -133,7 +133,7 @@ export function AssetForm({
                     {assetStatus.options.map((value) => (
                       <Field key={value} orientation="horizontal" className="w-auto">
                         <RadioGroupItem id={`status-${value}`} value={value} />
-                        <FieldLabel htmlFor={`status-${value}`}>{statusBadges[value].label}</FieldLabel>
+                        <FieldLabel htmlFor={`status-${value}`}>{assetStatusBadges[value].label}</FieldLabel>
                       </Field>
                     ))}
                   </RadioGroup>

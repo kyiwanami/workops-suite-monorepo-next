@@ -23,6 +23,7 @@ export async function exchangeToken(userToken: string) {
       customParameters: { subject_token_type: 'urn:ietf:params:oauth:token-type:access_token' },
     }),
   );
+  // 交換できなければ失敗
   if (accessToken === undefined) {
     throw new Error('トークンを交換できませんでした。');
   }
@@ -31,7 +32,7 @@ export async function exchangeToken(userToken: string) {
 
 // Gateway のツールの公開名の接頭辞です。Gateway は、ターゲット名と「___」をツール名の前に付けます。
 // 書込みのツールは、Gateway のツールと名前が重ならないように、接頭辞を外した名前で Harness に渡します。
-const gatewayPrefix = 'workops___';
+export const gatewayPrefix = 'workops___';
 
 // 交換したトークンで、利用者として Gateway に接続した MCP のクライアントを返します。呼び出し元が使い終わったら閉じます。
 // Gateway は MCP の初期化（initialize）で接続するため、プロトコルの版の問い合わせをしません。
@@ -50,6 +51,7 @@ export async function listGatewayTools(gateway: MCPClient) {
   const readTools = definitions.tools.filter((tool) => tool.annotations?.readOnlyHint === true).map((tool) => tool.name);
   const read = new Set(readTools);
   const tools = Object.fromEntries(
+    // 読み取りのツールは Gateway の名前のまま、書込みのツールは接頭辞を外す
     Object.entries(gateway.toolsFromDefinitions(definitions)).map(([name, tool]) => [read.has(name) ? name : name.slice(gatewayPrefix.length), tool]),
   );
   return { readTools, tools };

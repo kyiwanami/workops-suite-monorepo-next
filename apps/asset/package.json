@@ -12,6 +12,7 @@
   "dependencies": {
     "@aws-amplify/adapter-nextjs": "1.8.1",
     "@hookform/resolvers": "7.0.5",
+    "@nosecone/next": "1.16.0",
     "@workops/backend-asset": "*",
     "@workops/blocks": "*",
     "@workops/domain": "*",

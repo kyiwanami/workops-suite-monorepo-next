@@ -13,6 +13,7 @@
     "@aws-amplify/adapter-nextjs": "1.8.1",
     "@aws-sdk/client-cognito-identity-provider": "3.1164.0",
     "@hookform/resolvers": "7.0.5",
+    "@nosecone/next": "1.16.0",
     "@workops/backend-portal": "*",
     "@workops/blocks": "*",
     "@workops/domain": "*",

@@ -1,8 +1,9 @@
 import type { CallToolResult, JSONObject, ServerContext } from '@modelcontextprotocol/server';
 import { McpServer } from '@modelcontextprotocol/server';
 import { createAssetType } from '@workops/domain/asset-types';
-import { createAsset, deleteAsset, getAsset, listAssets, listAssetTypeOptions, updateAsset } from '@workops/domain/assets';
+import { createAsset, deleteAsset, getAsset, listAssets, listAssetTypeOptions, listMembers, updateAsset } from '@workops/domain/assets';
 import type { Context } from '@workops/domain/context';
+import { listDepartmentOptions } from '@workops/domain/departments';
 import { BusinessError } from '@workops/domain/errors';
 import { getMembership } from '@workops/domain/membership';
 import {
@@ -27,6 +28,8 @@ import {
   assetSchema,
   assetTypeOptionsSchema,
   assetUpdateSchema,
+  departmentOptionsSchema,
+  membersSchema,
 } from '@workops/schema/assets';
 import {
   requestConditionsSchema,
@@ -116,6 +119,36 @@ export function createServer() {
       annotations: read,
     },
     (ctx) => run(ctx, async (context) => ({ assetTypes: await listAssetTypeOptions(context) })),
+  );
+
+  server.registerTool(
+    'list-departments',
+    {
+      title: '部署の一覧',
+      description: '資産の登録で選べる部署を取得します。全体管理者はすべての部署、それ以外は自部署だけです。',
+      outputSchema: departmentOptionsSchema,
+      annotations: read,
+    },
+    (ctx) =>
+      run(ctx, async (context) => {
+        const departments = await listDepartmentOptions(context);
+        return { departments: context.member.isAdmin ? departments : departments.filter((item) => item.id === context.member.departmentId) };
+      }),
+  );
+
+  server.registerTool(
+    'list-members',
+    {
+      title: '担当者の候補の一覧',
+      description: '資産の担当者に選べる、部署の有効な利用者を取得します。全体管理者はすべての部署、それ以外は自部署の利用者です。',
+      outputSchema: membersSchema,
+      annotations: read,
+    },
+    (ctx) =>
+      run(ctx, async (context) => {
+        const departmentIds = context.member.isAdmin ? (await listDepartmentOptions(context)).map((item) => item.id) : [context.member.departmentId];
+        return { members: await listMembers(context, departmentIds) };
+      }),
   );
 
   server.registerTool(
