@@ -13,12 +13,11 @@ import {
 } from 'aws-cdk-lib/aws-cognito';
 import { PolicyStatement } from 'aws-cdk-lib/aws-iam';
 import { createAiBackend } from './ai';
+import { chat } from './functions/chat/resource';
 import { gatewayInterceptor } from './functions/gateway-interceptor/resource';
 import { preTokenGeneration } from './functions/pre-token-generation/resource';
-import { synchronizeGatewayTarget } from './functions/synchronize-gateway-target/resource';
-import { waitGatewayTarget } from './functions/wait-gateway-target/resource';
 
-const app = defineBackend({ preTokenGeneration, gatewayInterceptor, synchronizeGatewayTarget, waitGatewayTarget });
+const app = defineBackend({ preTokenGeneration, gatewayInterceptor, chat });
 
 // Blocks の Aurora と、デプロイ時に Drizzle のマイグレーションを適用する仕組みを構築します。
 const database = await createBlocksBackend(app.createStack('blocks'));
@@ -71,16 +70,25 @@ userPool.addTrigger(
 app.gatewayInterceptor.addEnvironment('USER_POOL_ID', userPool.userPoolId);
 
 // AI機能のスタックです。Gateway のインターセプターと同じスタックに置きます。
-const { gatewayUrl } = createAiBackend({
+const ai = createAiBackend({
   stack: Stack.of(app.gatewayInterceptor.resources.lambda),
   userPool,
   chatScope: OAuthScope.resourceServer(resourceServer, chatScope),
   cluster: database.cluster,
   databaseName: database.databaseName,
   gatewayInterceptor: app.gatewayInterceptor.resources.lambda,
-  synchronizeGatewayTarget: app.synchronizeGatewayTarget.resources.lambda,
-  waitGatewayTarget: app.waitGatewayTarget.resources.lambda,
+  chatFunction: app.chat.resources.lambda,
 });
+
+// チャットのAPIの処理が読む値です。
+for (const [name, value] of Object.entries({
+  ...ai.chat.environment,
+  DATABASE_NAME: database.databaseName,
+  SECRET_ARN: database.secretArn,
+  CLUSTER_ARN: database.clusterArn,
+})) {
+  app.chat.addEnvironment(name, value);
+}
 
 // 各アプリがクライアントを作るときと、サーバー側の処理で読む値です。
 app.addOutput({
@@ -88,6 +96,7 @@ app.addOutput({
   custom: {
     database: { clusterArn: database.clusterArn, secretArn: database.secretArn, databaseName: database.databaseName },
     authDomain: `workops-${prefix}.auth.${stack.region}.amazoncognito.com`,
-    gatewayUrl,
+    gatewayUrl: ai.gatewayUrl,
+    chatApiUrl: ai.chat.apiUrl,
   },
 });

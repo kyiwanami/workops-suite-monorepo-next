@@ -11,16 +11,18 @@ const db = createDatabase({
   resourceArn: env.CLUSTER_ARN,
 });
 
-// アクセストークンに、利用者のロールと全体管理者区分を入れます。AIの機能は、この値でツールを使えるかを決めます。
-// 所属がない利用者には何も入れません。
+// アクセストークンに、利用者のトークンであることを示す principal_type と、ロールと全体管理者区分を入れます。
+// チャットのAPIとHarnessは principal_type で利用者のトークンだけを受け付けます。この関数はマシン間の認可のトークンでは動かないため、そのトークンには入りません。
+// AIの機能は、ロールと全体管理者区分でツールを使えるかを決めます。所属がない利用者には入れません。
 export const handler: PreTokenGenerationV2TriggerHandler = async (event) => {
   const membership = await getMembership(db, event.request.userAttributes.sub);
-  if (membership !== null) {
-    event.response.claimsAndScopeOverrideDetails = {
-      accessTokenGeneration: {
-        claimsToAddOrOverride: { app_role: membership.role, app_admin: String(membership.isAdmin) },
+  event.response.claimsAndScopeOverrideDetails = {
+    accessTokenGeneration: {
+      claimsToAddOrOverride: {
+        principal_type: 'user',
+        ...(membership === null ? {} : { app_role: membership.role, app_admin: String(membership.isAdmin) }),
       },
-    };
-  }
+    },
+  };
   return event;
 };

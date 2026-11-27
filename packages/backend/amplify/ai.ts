@@ -3,7 +3,7 @@ import { execSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ArnFormat, AssetHashType, CfnResource, CustomResource, DockerImage, Duration, Names, Stack } from 'aws-cdk-lib';
+import { ArnFormat, AssetHashType, CfnResource, DockerImage, Duration, Names, Stack } from 'aws-cdk-lib';
 import {
   AgentCoreRuntime,
   AgentRuntimeArtifact,
@@ -34,10 +34,11 @@ import { PolicyStatement } from 'aws-cdk-lib/aws-iam';
 import type { IFunction } from 'aws-cdk-lib/aws-lambda';
 import type { DatabaseCluster } from 'aws-cdk-lib/aws-rds';
 import { CfnDelivery, CfnDeliveryDestination, CfnDeliverySource, LogGroup, LogRetention, RetentionDays } from 'aws-cdk-lib/aws-logs';
-import { Provider } from 'aws-cdk-lib/custom-resources';
+import { Secret } from 'aws-cdk-lib/aws-secretsmanager';
 import domainPackage from '../../domain/package.json';
 import { buildSync } from 'esbuild';
 import { mcpClientProviders } from './mcp-clients';
+import { createChatBackend } from './chat';
 import { createPolicies } from './policies';
 
 // 業務MCPサーバーのパッケージと、Runtime で動かすための自動計装のパッケージです。
@@ -52,8 +53,7 @@ export function createAiBackend(props: {
   cluster: DatabaseCluster;
   databaseName: string;
   gatewayInterceptor: IFunction;
-  synchronizeGatewayTarget: IFunction;
-  waitGatewayTarget: IFunction;
+  chatFunction: IFunction;
 }) {
   const { stack, userPool, cluster } = props;
   assert(cluster.secret);
@@ -111,6 +111,11 @@ export function createAiBackend(props: {
   const tokenExchangeClientResource = tokenExchangeClient.node.defaultChild;
   assert(tokenExchangeClientResource instanceof CfnUserPoolClient);
   tokenExchangeClientResource.explicitAuthFlows = ['ALLOW_TOKEN_EXCHANGE_IMPERSONATION'];
+  // 交換用のクライアントのシークレットです。チャットの経路の認証情報プロバイダーが読みます。
+  // クライアントと同じスタックに置き、ほかのスタックには ARN だけを渡します。
+  const tokenExchangeSecret = new Secret(userPoolStack, 'TokenExchangeClientSecret', {
+    secretObjectValue: { clientSecret: tokenExchangeClient.userPoolClientSecret },
+  });
 
   // 業務MCPサーバーです。1つのファイルに束ね、自動計装と AWS SDK のパッケージは node_modules に入れて同梱します。
   // 自動計装は、実行時に読み込まれた AWS SDK にフックをかけてスパンを作るため、AWS SDK は束ねません。版は業務の処理と同じにします。
@@ -175,7 +180,7 @@ export function createAiBackend(props: {
   );
   // 本文が入るログは90日残します。
   new LogRetention(stack, 'McpServerLogRetention', {
-    logGroupName: `/aws/bedrock-agentcore/runtimes/${runtime.agentRuntimeId}-DEFAULT`,
+    logGroupName: runtime.applicationLogGroup.logGroupName,
     retention: RetentionDays.THREE_MONTHS,
   });
 
@@ -237,33 +242,25 @@ export function createAiBackend(props: {
 
   // 業務MCPサーバーを Gateway のツールの提供元にします。ターゲットの名前がツールの公開名の接頭辞になります。
   // URL の中の Runtime の ARN は、URL エンコードした形で書きます。
+  // ターゲットを更新すると Gateway がツールの定義を取り直すため、説明に Runtime の版を入れ、業務MCPサーバーの更新のたびにターゲットを更新させます。
   const encodedRuntimeArn = `arn%3A${stack.partition}%3Abedrock-agentcore%3A${stack.region}%3A${stack.account}%3Aruntime%2F${runtime.agentRuntimeId}`;
   const target = GatewayTarget.forMcpServer(stack, 'McpServerTarget', {
     gateway,
     gatewayTargetName: 'workops',
     endpoint: `https://bedrock-agentcore.${stack.region}.amazonaws.com/runtimes/${encodedRuntimeArn}/invocations?qualifier=DEFAULT`,
     credentialProviderConfigurations: [GatewayCredentialProvider.fromIamRole({ service: 'bedrock-agentcore' })],
+    description: `Runtime version ${runtime.agentRuntimeVersion}`,
   });
   // ターゲットを作るときに Gateway がツールの定義を読むため、先に呼び出しを許可します。
   runtime.grantInvokeRuntime(gateway.role).applyBefore(target);
   target.node.addDependency(runtimePolicy);
 
-  // 業務MCPサーバーを更新したら、Gateway にツールの定義を取り直させ、終わるまでデプロイを待ちます。
-  target.grantSync(props.synchronizeGatewayTarget);
-  props.waitGatewayTarget.addToRolePolicy(
-    new PolicyStatement({ actions: ['bedrock-agentcore:GetGatewayTarget'], resources: [gateway.gatewayArn, `${gateway.gatewayArn}/*`] }),
-  );
-  const provider = new Provider(stack, 'TargetSyncProvider', {
-    onEventHandler: props.synchronizeGatewayTarget,
-    isCompleteHandler: props.waitGatewayTarget,
-  });
-  const synchronization = new CustomResource(stack, 'TargetSync', {
-    serviceToken: provider.serviceToken,
-    properties: { gatewayIdentifier: gateway.gatewayId, targetId: target.targetId, runtimeVersion: runtime.agentRuntimeVersion },
-  });
-
   // ツールの呼び出しを評価するポリシーです。
-  createPolicies({ stack, policyEngine, gateway, synchronization });
+  createPolicies({ stack, policyEngine, gateway, target });
+
+  // チャットの経路です。チャットのAPIの処理は、登録されたアプリのURLを共有の Aurora から読みます。
+  const chat = createChatBackend({ stack, userPool, gateway, tokenExchangeClient, tokenExchangeSecret, chatFunction: props.chatFunction });
+  cluster.grantDataApiAccess(props.chatFunction);
 
   // 利用者ごとに、ツールの呼び出しを毎分60回までにします。
   new CfnGatewayRateLimit(stack, 'RateLimit', {
@@ -295,8 +292,25 @@ export function createAiBackend(props: {
     new CfnDelivery(stack, `GatewayDelivery-${name}`, {
       deliverySourceName: source.name,
       deliveryDestinationArn: deliveryDestination.attrArn,
-    }).addDependency(source);
+    }).addResourceDependency(source);
   }
 
-  return { gatewayUrl: gateway.gatewayUrl };
+  return {
+    gatewayUrl: gateway.gatewayUrl,
+    chat: {
+      apiUrl: chat.api.url,
+      environment: {
+        HARNESS_ARN: chat.harness.attrArn,
+        GATEWAY_ARN: gateway.gatewayArn,
+        GATEWAY_URL: gateway.gatewayUrl,
+        MEMORY_ID: chat.memory.memoryId,
+        GUARDRAIL_ID: chat.guardrail.attrGuardrailId,
+        GUARDRAIL_VERSION: chat.guardrailVersion.attrVersion,
+        CREDENTIAL_PROVIDER_NAME: chat.credentialProvider.name,
+        CREDENTIAL_PROVIDER_ARN: chat.credentialProvider.attrCredentialProviderArn,
+        WORKLOAD_NAME: chat.workloadIdentity.workloadIdentityName,
+        HARNESS_IDLE_TIMEOUT: String(chat.idleRuntimeSessionTimeout),
+      },
+    },
+  };
 }

@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { boolean, check, integer, pgTable, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { boolean, check, integer, jsonb, pgTable, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 // テーブル定義をSQL生成と読み書きの型推論の共通の定義元にします。
 // 日時はData APIの戻り値に合わせて文字列で扱います。
@@ -125,3 +125,16 @@ export const auditLog = pgTable('AuditLog', {
   check('AuditLog_previousStatus', sql`"previousStatus" in ('draft', 'submitted', 'approved', 'rejected', 'withdrawn')`),
   check('AuditLog_newStatus', sql`"newStatus" in ('draft', 'submitted', 'approved', 'rejected', 'withdrawn')`),
 ]);
+
+// 確認カードの判断
+// AIチャットの書込みツールの呼び出し（確認カード）ごとに、表示から判断・実行結果までの状態を記録します。
+// 判断は状態が requested の行だけを更新して受け付け、同じ呼び出しへの判断を最初の1回だけ受け付けます。
+// createdAt・createdByに確認カードを表示した日時と依頼した利用者、updatedAt・updatedByに最後に状態を更新した日時と利用者を記録します。
+export const toolApproval = pgTable('ToolApproval', {
+  toolUseId: text().primaryKey(), // ツール呼び出しのID
+  conversationId: uuid().notNull(), // 会話のID
+  toolName: text().notNull(), // ツール名
+  input: jsonb().notNull(), // ツール呼び出しの入力
+  status: text({ enum: ['requested', 'approved', 'denied', 'succeeded', 'failed', 'abandoned', 'expired'] }).notNull(), // 状態
+  ...commonColumns,
+}, () => [check('ToolApproval_status', sql`"status" in ('requested', 'approved', 'denied', 'succeeded', 'failed', 'abandoned', 'expired')`)]);

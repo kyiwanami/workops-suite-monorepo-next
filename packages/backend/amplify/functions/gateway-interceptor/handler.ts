@@ -1,5 +1,5 @@
 import { env } from '$amplify/env/gateway-interceptor';
-import type { JSONRPCRequest } from '@modelcontextprotocol/server';
+import { INVALID_REQUEST, type JSONRPCErrorResponse, type JSONRPCRequest } from '@modelcontextprotocol/server';
 import type { Handler } from 'aws-lambda';
 import { CognitoJwtVerifier } from 'aws-jwt-verify';
 
@@ -36,7 +36,11 @@ export const handler: Handler<InterceptorEvent> = async (event) => {
       mcp: {
         transformedGatewayResponse: {
           statusCode: 401,
-          body: { jsonrpc: '2.0', id: body.id, error: { code: -32600, message: '利用者を確認できませんでした。' } },
+          body: {
+            jsonrpc: '2.0',
+            id: body.id,
+            error: { code: INVALID_REQUEST, message: '利用者を確認できませんでした。' },
+          } satisfies JSONRPCErrorResponse,
         },
       },
     };

@@ -1,0 +1,38 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "96664f33-3ec2-4051-ae60-4f1873a4f150",
+  "prevIds": [
+    "af1705f0-3bb9-438d-b54f-64e8f7193cfd"
+  ],
+  "footprints": [
+    {
+      "statementType": "alter_check",
+      "statementTarget": [
+        "table",
+        "public",
+        "ToolApproval"
+      ],
+      "writes": [
+        "s|ck|public.ToolApproval.ToolApproval_status"
+      ],
+      "reads": [
+        "n|tbl|public.ToolApproval",
+        "n|sch|public",
+        "n|col|public.ToolApproval.status",
+        "e|col|public.ToolApproval.status"
+      ],
+      "sqlHash": "5429eb6cad44ac56"
+    }
+  ],
+  "deltas": [
+    {
+      "op": "alter",
+      "key": "checks\u0000[\"public\",\"ToolApproval\",\"ToolApproval_status\"]",
+      "set": {
+        "value": "\"status\" in ('requested', 'approved', 'denied', 'succeeded', 'failed', 'abandoned', 'expired')"
+      }
+    }
+  ]
+}

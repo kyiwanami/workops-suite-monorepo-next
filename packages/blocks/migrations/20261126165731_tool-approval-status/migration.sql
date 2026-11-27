@@ -1,0 +1,1 @@
+ALTER TABLE "ToolApproval" DROP CONSTRAINT "ToolApproval_status", ADD CONSTRAINT "ToolApproval_status" CHECK ("status" in ('requested', 'approved', 'denied', 'succeeded', 'failed', 'abandoned', 'expired'));

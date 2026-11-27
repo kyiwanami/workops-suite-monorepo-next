@@ -33,15 +33,15 @@ const tools = {
 };
 
 // Gateway のツールの呼び出しを評価するポリシーです。
-// ポリシーはツールの定義で検証されるため、Gateway がツールの定義を取り直したあとに作ります。
+// ポリシーはツールの定義で検証されるため、Gateway がターゲットからツールの定義を読んだあとに作ります。
 // JWT のクレームは Cedar ではタグになり、L2 の部品では読めないため、Cedar の文で書きます。
 export function createPolicies(props: {
   stack: Stack;
   policyEngine: PolicyEngine;
   gateway: Gateway;
-  synchronization: IDependable;
+  target: IDependable;
 }) {
-  const { stack, policyEngine, synchronization } = props;
+  const { stack, policyEngine, target } = props;
   const resource = `AgentCore::Gateway::"${props.gateway.gatewayArn}"`;
   const actions = (names: string[]) => names.map((name) => `AgentCore::Action::"workops___${name}"`).join(', ');
 
@@ -59,7 +59,7 @@ export function createPolicies(props: {
         `permit(principal is AgentCore::OAuthUser, action in [${actions(tools[role])}], resource == ${resource}) when { ${roles[role]} };`,
       ),
     });
-    policy.node.addDependency(synchronization);
+    policy.node.addDependency(target);
   }
   const admin = new Policy(stack, 'Policy-admin', {
     policyEngine,
@@ -68,7 +68,7 @@ export function createPolicies(props: {
       `permit(principal is AgentCore::OAuthUser, action, resource == ${resource}) when { principal.hasTag("app_admin") && principal.getTag("app_admin") == "true" };`,
     ),
   });
-  admin.node.addDependency(synchronization);
+  admin.node.addDependency(target);
 
   // 他の利用者が書いた自由記述を返す読み取りツールの結果に、攻撃の文が入っていないかを調べます。
   // ガードレールの条件は L2 で書けないため、L1 で書きます。
@@ -90,5 +90,5 @@ export function createPolicies(props: {
     validationMode: 'IGNORE_ALL_FINDINGS',
     enforcementMode: 'LOG_ONLY',
   });
-  attackDetection.node.addDependency(synchronization);
+  attackDetection.node.addDependency(target);
 }
