@@ -12,11 +12,11 @@ export default async function NewAssetPage() {
   if (!hasRole(member, 'editor')) {
     notFound();
   }
-  const [assetTypes, departments] = await Promise.all([
+  const [assetTypes, departments, members] = await Promise.all([
     listAssetTypeOptions(),
     member.isAdmin ? listDepartmentOptions() : null,
+    listMembers(null),
   ]);
-  const members = await listMembers(departments === null ? [member.departmentId] : departments.map((item) => item.id));
   return (
     <>
       <nav className="text-sm text-muted-foreground">

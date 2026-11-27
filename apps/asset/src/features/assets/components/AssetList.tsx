@@ -9,7 +9,7 @@ import { useQueryStates } from 'nuqs';
 import { unstable_rethrow } from 'next/navigation';
 import { type ReactNode, useState, useTransition } from 'react';
 import { changeStatusAction } from '@/server/assets/actions';
-import type { AssetRow } from '@/server/assets/data';
+import type { AssetItem, AssetStatus } from '@workops/schema/assets';
 import { formatDateTime, assetStatusBadges } from '@workops/ui/lib/labels';
 import { assetSearchParams } from '../search-params';
 import { StatusMenu } from './StatusMenu';
@@ -22,17 +22,17 @@ export function AssetList({
   showDepartment,
   filters,
 }: {
-  assets: AssetRow[];
+  assets: AssetItem[];
   editable: boolean;
   showDepartment: boolean;
   filters: ReactNode;
 }) {
-  const [changed, setChanged] = useState<Awaited<ReturnType<typeof changeStatusAction>> | null>(null);
+  const [changed, setChanged] = useState<{ from: AssetStatus; to: AssetStatus } | null>(null);
   const [failed, setFailed] = useState(false);
   const [pending, startTransition] = useTransition();
   const [, setParams] = useQueryStates(assetSearchParams, { shallow: false });
   // 状態を保存し、変えた内容を出します。変えられなければ、その旨を同じ場所に出します。
-  const change = (id: string, status: AssetRow['status']) =>
+  const change = (id: string, status: AssetStatus) =>
     startTransition(async () => {
       // 前の操作の結果の表示は消す
       void setParams({ done: null });
@@ -47,7 +47,7 @@ export function AssetList({
       }
     });
   // 状態のバッジです。
-  const statusMenu = (item: AssetRow) => (
+  const statusMenu = (item: AssetItem) => (
     <StatusMenu
       status={item.status}
       editable={editable}

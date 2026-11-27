@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 // 申請種別の登録・編集フォームの入力です。画面とサーバーの両方で検証します。
-// 表示順は数の入力欄で、空のときも同じ文言を出します。説明は、AIツールの入力の説明にも使います。
+// 表示順は数の入力欄で、空のときも同じ文言を出します。
 export const requestTypeSchema = z.object({
   code: z
     .string()

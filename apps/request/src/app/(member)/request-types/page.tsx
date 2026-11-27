@@ -7,7 +7,6 @@ import { loadRequestTypeSearchParams } from '@/features/request-types/search-par
 import { RequestTypeTable } from '@/features/request-types/components/RequestTypeTable';
 import { listRequestTypes } from '@/server/request-types/data';
 
-// 全部署共通の申請種別の一覧と、登録・編集・削除です。承認者以上だけが開けます。
 // 登録・保存・削除して戻ったときの文言です。
 const doneMessages = {
   created: '申請種別を登録しました',
@@ -15,6 +14,7 @@ const doneMessages = {
   deleted: '申請種別を削除しました',
 };
 
+// 全部署共通の申請種別の一覧と、登録・編集・削除です。承認者以上だけが開けます。
 export default async function RequestTypesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const { done } = await loadRequestTypeSearchParams(searchParams);
   const requestTypes = await listRequestTypes();

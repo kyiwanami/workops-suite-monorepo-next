@@ -15,7 +15,7 @@ import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import type { z } from 'zod';
 import { createRequestAction, submitRequestAction, updateRequestAction } from '@/server/requests/actions';
-import type { Option, RequestDetail } from '@/server/requests/data';
+import type { RequestDetail, RequestTypeOption } from '@workops/schema/requests';
 import { requestSchema } from '@workops/schema/requests';
 import { serializeRequestSearchParams } from '../search-params';
 import { ActionBar } from './ActionBar';
@@ -30,7 +30,7 @@ export function RequestForm({
   resubmit,
 }: {
   request: RequestDetail | null;
-  requestTypes: Option[];
+  requestTypes: RequestTypeOption[];
   resubmit: boolean;
 }) {
   const router = useRouter();

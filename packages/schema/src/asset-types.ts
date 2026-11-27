@@ -20,3 +20,8 @@ export const assetTypeSchema = z.object({
     .int('表示順は整数で入力してください。')
     .meta({ title: '表示順', description: '表示順' }),
 });
+
+// 登録した資産種別です。資産種別の登録の結果に使います。
+export const assetTypeIdSchema = z.object({
+  assetTypeId: z.uuid().meta({ description: '資産種別のID' }),
+});

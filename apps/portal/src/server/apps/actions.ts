@@ -24,7 +24,7 @@ export async function updateAppAction(input: z.infer<typeof appSchema>) {
 
 // アプリと配下のページを削除し、管理の一覧とホームを最新にします。
 export async function deleteAppAction(formData: FormData) {
-  await deleteApp(String(formData.get('appId')));
+  await deleteApp(appSchema.shape.appId.parse(formData.get('appId')));
   revalidatePath('/admin/apps');
   revalidatePath('/');
   redirect(serializeAppSearchParams('/admin/apps', { done: 'appDeleted' }));
@@ -47,7 +47,7 @@ export async function updatePageAction(input: z.infer<typeof pageSchema>) {
 
 // ページを削除し、管理の一覧とホームを最新にします。
 export async function deletePageAction(formData: FormData) {
-  await deletePage(String(formData.get('appId')), String(formData.get('pageId')));
+  await deletePage(pageSchema.shape.appId.parse(formData.get('appId')), pageSchema.shape.pageId.parse(formData.get('pageId')));
   revalidatePath('/admin/apps');
   revalidatePath('/');
   redirect(serializeAppSearchParams('/admin/apps', { done: 'pageDeleted' }));

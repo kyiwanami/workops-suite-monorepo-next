@@ -5,7 +5,7 @@ let token: Promise<string> | undefined;
 
 // 画面のサーバーから、利用者のアクセストークンを受け取ります。受け取れなかったときは、次の呼び出しで受け取り直します。
 function fetchToken() {
-  token = fetch('/api/chat-token', { cache: 'no-store' })
+  token = fetch('/api/chat-token')
     .then(async (response) => {
       if (!response.ok) {
         throw new Error('トークンを受け取れませんでした。');

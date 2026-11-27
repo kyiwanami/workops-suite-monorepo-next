@@ -6,7 +6,7 @@ import { Button } from '@workops/ui/components/button';
 import { Spinner } from '@workops/ui/components/spinner';
 import { assetStatusBadges, formatAmount, formatDateTime, requestStatusBadges } from '@workops/ui/lib/labels';
 import { writeTools } from '@workops/schema/tools';
-import type { DynamicToolUIPart, JSONValue } from 'ai';
+import type { ChatAddToolApproveResponseFunction, DynamicToolUIPart, JSONValue } from 'ai';
 import { ArrowRightIcon, CircleAlertIcon, CircleCheckIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
@@ -148,9 +148,10 @@ function Outcome({ part, resultAt }: { part: DynamicToolUIPart; resultAt: string
     </>
   );
 
+  if (part.state === 'output-denied' || (part.state === 'approval-responded' && !part.approval.approved)) {
+    return <span className="text-muted-foreground">この操作は実行していません。必要なら、もう一度依頼してください。</span>;
+  }
   switch (part.state) {
-    case 'output-denied':
-      return <span className="text-muted-foreground">この操作は実行していません。必要なら、もう一度依頼してください。</span>;
     case 'output-error':
       return failure(part.errorText);
     case 'output-available':
@@ -165,11 +166,6 @@ function Outcome({ part, resultAt }: { part: DynamicToolUIPart; resultAt: string
           {at}
         </>
       );
-    case 'approval-responded':
-      if (!part.approval.approved) {
-        return <span className="text-muted-foreground">この操作は実行していません。必要なら、もう一度依頼してください。</span>;
-      }
-      break;
   }
   return (
     <>
@@ -194,7 +190,7 @@ export function ToolPart({
   target: JSONValue | undefined;
   names: Record<string, string> | undefined;
   resultAt: string | undefined;
-  onRespond: (response: { id: string; approved: boolean }) => void;
+  onRespond: ChatAddToolApproveResponseFunction;
 }) {
   if (part.providerExecuted === true || part.state === 'input-streaming' || part.state === 'input-available') {
     return null;

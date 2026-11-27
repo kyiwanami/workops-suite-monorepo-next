@@ -3,7 +3,7 @@
 import { Field, FieldError, FieldLabel } from '@workops/ui/components/field';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@workops/ui/components/select';
 import type { ControllerFieldState } from 'react-hook-form';
-import type { DepartmentOption } from '@/server/users/data';
+import type { DepartmentOption } from '@workops/schema/assets';
 
 // 所属部署の選択です。
 export function DepartmentField({
@@ -20,7 +20,7 @@ export function DepartmentField({
   return (
     <Field data-invalid={fieldState.invalid}>
       <FieldLabel htmlFor="departmentId">部署</FieldLabel>
-      <Select name="departmentId" value={value} onValueChange={onChange}>
+      <Select value={value} onValueChange={onChange}>
         <SelectTrigger id="departmentId" className="w-full">
           <SelectValue placeholder="部署を選ぶ" />
         </SelectTrigger>

@@ -32,7 +32,7 @@ export function createAlarms(props: {
   const { stack, gateway, runtime, policyEngine, harness } = props;
   assert(alarmEmail !== undefined, '環境変数 ALARM_EMAIL に、アラームの通知先のメールアドレスを指定してください。');
 
-  const topic = new Topic(stack, 'AlarmTopic');
+  const topic = new Topic(stack, 'AlarmTopic', { enforceSSL: true });
   topic.addSubscription(new EmailSubscription(alarmEmail));
   // アラームとダッシュボードの名前はアカウントとリージョンで一意のため、スタックごとに一意の接頭辞を付けます。
   const prefix = Names.uniqueResourceName(stack, { maxLength: 40 });

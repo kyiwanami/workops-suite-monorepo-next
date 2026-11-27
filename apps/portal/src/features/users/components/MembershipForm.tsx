@@ -9,7 +9,8 @@ import { SubmitButton } from '@workops/ui/workops/submit-button';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { saveMembershipAction } from '@/server/users/actions';
-import type { DepartmentOption, UserDetail } from '@/server/users/data';
+import type { DepartmentOption } from '@workops/schema/assets';
+import type { z } from 'zod';
 import { membershipSchema } from '../schema';
 import { DepartmentField } from './DepartmentField';
 import { RoleField } from './RoleField';
@@ -23,7 +24,7 @@ export function MembershipForm({
 }: {
   sub: string;
   departments: DepartmentOption[];
-  membership: UserDetail['membership'];
+  membership: z.infer<typeof membershipSchema> | null;
 }) {
   const [saved, setSaved] = useState<boolean | null>(null);
   const form = useForm({

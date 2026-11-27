@@ -4,16 +4,16 @@ import { Badge } from '@workops/ui/components/badge';
 import { Input } from '@workops/ui/components/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@workops/ui/components/select';
 import { Tabs, TabsList, TabsTrigger } from '@workops/ui/components/tabs';
-import { requestPeriods, requestTabs } from '@workops/schema/requests';
+import type { DepartmentOption } from '@workops/schema/assets';
+import { type RequestCounts, requestPeriod, type RequestPeriod, requestTab, type RequestTypeOption } from '@workops/schema/requests';
 import { useQueryStates } from 'nuqs';
-import type { listRequests, Option } from '@/server/requests/data';
 import { requestSearchParams } from '../search-params';
 
 // 「すべて」を表す選択肢の値です。Select は空の値を選択肢にできないため、この値で表します。
 const all = 'all';
 
 // 期間の表示名です。
-const periodLabels: Record<(typeof requestPeriods)[number], string> = {
+const periodLabels: Record<RequestPeriod, string> = {
   thisMonth: '今月',
   lastMonth: '先月',
   all: 'すべて',
@@ -29,9 +29,9 @@ export function RequestFilters({
   departments,
 }: {
   canApprove: boolean;
-  counts: Awaited<ReturnType<typeof listRequests>>['counts'];
-  requestTypes: Option[];
-  departments: Option[] | null;
+  counts: RequestCounts;
+  requestTypes: RequestTypeOption[];
+  departments: DepartmentOption[] | null;
 }) {
   const [params, setParams] = useQueryStates(requestSearchParams, { shallow: false });
   return (
@@ -39,8 +39,7 @@ export function RequestFilters({
       <Tabs
         value={params.tab}
         onValueChange={(value) => {
-          const tab = requestTabs.find((item) => item === value);
-          void setParams({ tab: tab ?? null, page: null, done: null });
+          void setParams({ tab: requestTab.parse(value), page: null, done: null });
         }}
       >
         <TabsList>
@@ -75,7 +74,7 @@ export function RequestFilters({
             void setParams({ q: String(new FormData(event.currentTarget).get('q')) || null, page: null, done: null });
           }}
         >
-          <Input name="q" type="search" placeholder="件名・申請者で検索" defaultValue={params.q ?? ''} />
+          <Input key={params.q} name="q" type="search" placeholder="件名・申請者で検索" defaultValue={params.q ?? ''} />
         </form>
         <Select
           value={params.type ?? all}
@@ -96,15 +95,14 @@ export function RequestFilters({
         <Select
           value={params.period}
           onValueChange={(value) => {
-            const period = requestPeriods.find((item) => item === value);
-            void setParams({ period: period ?? null, page: null, done: null });
+            void setParams({ period: requestPeriod.parse(value), page: null, done: null });
           }}
         >
           <SelectTrigger className="w-36">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {requestPeriods.map((value) => (
+            {requestPeriod.options.map((value) => (
               <SelectItem key={value} value={value}>
                 期間：{periodLabels[value]}
               </SelectItem>

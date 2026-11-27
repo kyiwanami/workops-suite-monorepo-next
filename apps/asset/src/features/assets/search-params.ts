@@ -1,8 +1,7 @@
-import { asset } from '@workops/blocks/schema';
+import { assetStatus } from '@workops/schema/assets';
 import {
   createLoader,
   createSerializer,
-  type inferParserType,
   parseAsInteger,
   parseAsString,
   parseAsStringLiteral,
@@ -12,7 +11,7 @@ import {
 // done は、資産を保存・削除して一覧へ戻ったことを表します。
 export const assetSearchParams = {
   q: parseAsString,
-  status: parseAsStringLiteral(asset.status.enumValues),
+  status: parseAsStringLiteral(assetStatus.options),
   type: parseAsString,
   department: parseAsString,
   page: parseAsInteger.withDefault(1),
@@ -24,6 +23,3 @@ export const loadAssetSearchParams = createLoader(assetSearchParams);
 
 // 検索条件から一覧の URL を作ります。
 export const serializeAssetSearchParams = createSerializer(assetSearchParams);
-
-// 読んだ検索条件の型です。
-export type AssetSearchParams = inferParserType<typeof assetSearchParams>;

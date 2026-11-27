@@ -2,13 +2,23 @@ import 'server-only';
 import { db } from '@workops/server/db';
 import { app, page } from '@workops/blocks/schema';
 import { and, asc, eq } from 'drizzle-orm';
-import type { z } from 'zod';
+import { createSelectSchema } from 'drizzle-orm/zod';
+import { z } from 'zod';
 import { getAdmin } from '@/server/user';
 import type { appSchema, pageSchema } from '@/features/apps/schema';
 
-// アプリを作成順に、配下のページをページ ID の順に付けて返します。
-export async function listApps() {
-  await getAdmin();
+// アプリの配下のページです。DB のページの列から作ります。
+const pageRowSchema = createSelectSchema(page).pick({ appId: true, pageId: true, name: true, description: true, relativePath: true, role: true });
+export type PageRow = z.infer<typeof pageRowSchema>;
+
+// アプリと、配下のページです。DB のアプリの列から作ります。
+export const appRowSchema = createSelectSchema(app)
+  .pick({ appId: true, name: true, description: true, urlDomain: true, iconName: true })
+  .extend({ pages: z.array(pageRowSchema) });
+export type AppRow = z.infer<typeof appRowSchema>;
+
+// アプリを作成順に、配下のページをページ ID の順に付けて返します。権限は呼び出し元で確かめます。
+export async function readApps(): Promise<AppRow[]> {
   const [apps, pages] = await Promise.all([
     db
       .select({ appId: app.appId, name: app.name, description: app.description, urlDomain: app.urlDomain, iconName: app.iconName })
@@ -29,8 +39,11 @@ export async function listApps() {
   return apps.map((item) => ({ ...item, pages: pages.filter((child) => child.appId === item.appId) }));
 }
 
-// アプリの一覧の1件の型です。配下のページを含みます。
-export type AppRow = Awaited<ReturnType<typeof listApps>>[number];
+// 管理の画面のアプリの一覧です。全体管理者だけが読めます。
+export async function listApps() {
+  await getAdmin();
+  return readApps();
+}
 
 // アプリの保存する値です。説明とアイコンは空なら未設定にします。
 const appColumns = (values: z.infer<typeof appSchema>) => ({

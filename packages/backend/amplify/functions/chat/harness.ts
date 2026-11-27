@@ -21,6 +21,7 @@ import {
   type HarnessTokenUsage,
   type HarnessTool,
   type HarnessToolResultBlock,
+  type HarnessToolResultContentBlock,
   HarnessToolType,
   HarnessToolUseStatus,
   InternalServerException,
@@ -32,15 +33,20 @@ import {
 import { isSpecType } from '@modelcontextprotocol/client';
 import { ReadableStream } from 'node:stream/web';
 
-// Harness が止まった理由を、AI SDK の終了理由にします。Harness の止まった理由は Bedrock の Converse と同じ値のため、
+// Harness が止まった理由を、AI SDK の終了理由にします。Bedrock の Converse と同じ値は、
 // AI SDK の Bedrock のプロバイダー（@ai-sdk/amazon-bedrock の mapAmazonBedrockFinishReason。公開されていない）と同じ読み替えにします。
+// Harness: 出力の上限は length、ツールの呼び出しやモデルの出力の形の誤りは error にします。
 function mapFinishReason(stopReason: HarnessStopReason | undefined): LanguageModelV4FinishReason['unified'] {
   switch (stopReason) {
     case HarnessStopReason.STOP_SEQUENCE:
     case HarnessStopReason.END_TURN:
       return 'stop';
     case HarnessStopReason.MAX_TOKENS:
+    case HarnessStopReason.MAX_OUTPUT_TOKENS_EXCEEDED:
       return 'length';
+    case HarnessStopReason.MALFORMED_TOOL_USE:
+    case HarnessStopReason.MALFORMED_MODEL_OUTPUT:
+      return 'error';
     case HarnessStopReason.CONTENT_FILTERED:
       return 'content-filter';
     case HarnessStopReason.TOOL_USE:
@@ -49,6 +55,9 @@ function mapFinishReason(stopReason: HarnessStopReason | undefined): LanguageMod
       return 'other';
   }
 }
+
+// ツールの結果の部品を、1つの文にします。Harness のストリームの結果と、Memory の履歴の結果で使います。
+export const contentText = (content: HarnessToolResultContentBlock[]) => content.map((item) => item.text ?? JSON.stringify(item.json)).join('');
 
 // Gateway のツールです。Harness が、受け取ったトークンを交換して Gateway を呼びます。
 const gatewayTool: HarnessTool = {
@@ -291,7 +300,7 @@ function toStreamParts({ sent, inline }: { sent: Set<string>; inline: Set<string
     }
     // Harness: Harness が実行したツールの結果：閉じるときのためにためる
     if (delta.toolResult && contentBlock?.type === 'tool-result') {
-      contentBlock.output += delta.toolResult.map((item) => item.text ?? JSON.stringify(item.json)).join('');
+      contentBlock.output += contentText(delta.toolResult);
     }
   }
 
@@ -392,5 +401,6 @@ function convertUsage(usage: { inputTokens: number; outputTokens: number; cacheR
       cacheWrite: usage.cacheWriteInputTokens,
     },
     outputTokens: { total: usage.outputTokens, text: usage.outputTokens, reasoning: undefined },
+    raw: usage,
   };
 }

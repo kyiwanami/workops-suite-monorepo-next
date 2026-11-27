@@ -38,7 +38,7 @@
   --ai: #0a6b60;
   --ai-foreground: #ffffff;
   /* 浮く要素（AIのパネルと起動ボタン）の影です。付けた要素には枠を付けません。 */
-  --shadow-panel: 0 8px 24px rgba(35, 38, 43, 0.14);
+  --panel-shadow: 0 8px 24px rgba(35, 38, 43, 0.14);
 }
 
 .dark {
@@ -69,7 +69,7 @@
   --ai: #3fd2bf;
   --ai-foreground: #06231f;
   /* 暗い背景では影だけでは浮いて見えないため、1pxの輪郭を足します。 */
-  --shadow-panel: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px #31353d;
+  --panel-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px #31353d;
 }
 
 @theme inline {
@@ -108,7 +108,7 @@
   --radius-xl: calc(var(--radius) + 4px);
   /* 影の濃さは、ライトで 10%、ダークで 50% にします。 */
   --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / var(--shadow-alpha)), 0 1px 2px -1px rgb(0 0 0 / var(--shadow-alpha));
-  --shadow-panel: var(--shadow-panel);
+  --shadow-panel: var(--panel-shadow);
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / var(--shadow-alpha)), 0 4px 6px -4px rgb(0 0 0 / var(--shadow-alpha));
 }
 

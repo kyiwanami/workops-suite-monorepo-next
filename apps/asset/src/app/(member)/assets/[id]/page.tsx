@@ -17,7 +17,7 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
   const badge = assetStatusBadges[asset.status];
   const editable = hasRole(member, 'editor');
   const [assetTypes, members] = editable
-    ? await Promise.all([listAssetTypeOptions(), listMembers([asset.departmentId])])
+    ? await Promise.all([listAssetTypeOptions(), listMembers(asset.departmentId)])
     : [[], []];
   return (
     <>

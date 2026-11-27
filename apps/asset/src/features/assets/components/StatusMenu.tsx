@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@workops/ui/components/dropdown-menu';
 import { ChevronDown } from 'lucide-react';
-import type { AssetRow } from '@/server/assets/data';
+import type { AssetStatus } from '@workops/schema/assets';
 import { assetStatusBadges } from '@workops/ui/lib/labels';
 import { assetStatus } from '@workops/schema/assets';
 
@@ -20,10 +20,10 @@ export function StatusMenu({
   disabled,
   onChange,
 }: {
-  status: AssetRow['status'];
+  status: AssetStatus;
   editable: boolean;
   disabled: boolean;
-  onChange: (status: AssetRow['status']) => void;
+  onChange: (status: AssetStatus) => void;
 }) {
   const badge = assetStatusBadges[status];
   if (!editable) {

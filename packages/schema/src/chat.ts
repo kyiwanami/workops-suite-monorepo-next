@@ -11,6 +11,7 @@ export const chatSchema = z.object({
 export const chatTokenSchema = z.object({
   accessToken: z.string().meta({ description: '利用者のアクセストークン' }),
 });
+export type ChatToken = z.infer<typeof chatTokenSchema>;
 
 // チャットのAPIが返す、利用者の会話の一覧です。新しい順に並びます。
 export const conversationsSchema = z.object({
@@ -35,6 +36,6 @@ export const dataPartSchemas = {
   target: z.record(z.string(), z.json()).meta({ description: '確認カードを表示した時点の対象の値' }),
   names: z.record(z.string(), z.string()).meta({ description: '入力の ID の項目の名前' }),
   result: z.object({
-    at: z.string().meta({ description: '書込みのツールを実行した日時' }),
+    at: z.iso.datetime().meta({ description: '書込みのツールを実行した日時' }),
   }),
 };

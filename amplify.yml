@@ -8,7 +8,7 @@ applications:
         preBuild:
           commands:
             - nvm install 24
-            - npm ci
+            - npm ci --cache .npm --prefer-offline
         build:
           commands:
             # 共有のユーザープール・ログイン画面のドメイン・Aurora をデプロイします。
@@ -19,6 +19,9 @@ applications:
         baseDirectory: packages/backend/dist
         files:
           - '**/*'
+      cache:
+        paths:
+          - .npm/**/*
   - appRoot: apps/portal
     frontend:
       # モノレポのルートから install とビルドを実行します。
@@ -27,7 +30,7 @@ applications:
         preBuild:
           commands:
             - nvm install 24
-            - npm ci
+            - npm ci --cache .npm --prefer-offline
         build:
           commands:
             # 共有バックエンドの出力を取得し、共有のユーザープールにポータルのクライアントを作ります。
@@ -42,7 +45,8 @@ applications:
           - '**/*'
       cache:
         paths:
-          - node_modules/**/*
+          - .npm/**/*
+          - apps/portal/.next/cache/**/*
   - appRoot: apps/asset
     frontend:
       # モノレポのルートから install とビルドを実行します。
@@ -51,7 +55,7 @@ applications:
         preBuild:
           commands:
             - nvm install 24
-            - npm ci
+            - npm ci --cache .npm --prefer-offline
         build:
           commands:
             # 共有バックエンドの出力を取得し、共有のユーザープールに資産カタログのクライアントを作ります。
@@ -66,7 +70,8 @@ applications:
           - '**/*'
       cache:
         paths:
-          - node_modules/**/*
+          - .npm/**/*
+          - apps/asset/.next/cache/**/*
   - appRoot: apps/request
     frontend:
       # モノレポのルートから install とビルドを実行します。
@@ -75,7 +80,7 @@ applications:
         preBuild:
           commands:
             - nvm install 24
-            - npm ci
+            - npm ci --cache .npm --prefer-offline
         build:
           commands:
             # 共有バックエンドの出力を取得し、共有のユーザープールに申請管理のクライアントを作ります。
@@ -90,4 +95,5 @@ applications:
           - '**/*'
       cache:
         paths:
-          - node_modules/**/*
+          - .npm/**/*
+          - apps/request/.next/cache/**/*

@@ -9,22 +9,37 @@ import {
   UsernameExistsException,
 } from '@aws-sdk/client-cognito-identity-provider';
 import { cognito, userPoolId } from '@workops/server/cognito';
+import * as departments from '@workops/domain/departments';
+import type { Membership } from '@workops/domain/membership';
 import { attribute, listCognitoUsers, requiredAttribute } from '@workops/domain/users';
+import type { DepartmentOption } from '@workops/schema/assets';
 import { db } from '@workops/server/db';
 import { department, userMembership } from '@workops/blocks/schema';
-import { asc, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { notFound } from 'next/navigation';
 import type { z } from 'zod';
-import { getAdmin } from '@/server/user';
-import type { accountStatus, membershipSchema, userSchema } from '@/features/users/schema';
+import { getAdmin, getContext } from '@/server/user';
+import type { AccountStatus, membershipSchema, userSchema } from '@/features/users/schema';
 import type { UserSearchParams } from '@/features/users/search-params';
 
 // 一覧の1ページの件数です。
-export const pageSize = 20;
+const pageSize = 20;
 
+// ユーザーの一覧の1行です。
+export type UserRow = { sub: string; name: string | undefined; email: string; status: AccountStatus; membership: Membership | null };
+
+// ユーザーの詳細です。
+export type UserDetail = {
+  sub: string;
+  name: string | undefined;
+  email: string;
+  status: AccountStatus;
+  invitedAt: Date | undefined;
+  membership: z.infer<typeof membershipSchema> | null;
+};
 
 // Cognito のユーザーの有効区分と状態から、アカウントの状態を決めます。
-const statusOf = (enabled: boolean | undefined, userStatus: string | undefined): z.infer<typeof accountStatus> => {
+const statusOf = (enabled: boolean | undefined, userStatus: string | undefined): AccountStatus => {
   if (enabled === false) {
     return 'disabled';
   }
@@ -47,7 +62,7 @@ async function listMemberships() {
 }
 
 // ユーザーの一覧です。名前・メールの部分一致・部署・状態で絞り込み、メールの昇順で1ページ分を返します。
-export async function listUsers(conditions: UserSearchParams) {
+export async function listUsers(conditions: UserSearchParams): Promise<{ total: number; start: number; users: UserRow[] }> {
   await getAdmin();
   const [cognitoUsers, memberships] = await Promise.all([listCognitoUsers(cognito, userPoolId), listMemberships()]);
   const keyword = conditions.q?.toLowerCase();
@@ -71,21 +86,19 @@ export async function listUsers(conditions: UserSearchParams) {
         (conditions.status === null || user.status === conditions.status),
     )
     .sort((a, b) => a.email.localeCompare(b.email));
-  const start = (conditions.page - 1) * pageSize;
+  // 1 より前のページは1ページ目として扱う
+  const start = (Math.max(conditions.page, 1) - 1) * pageSize;
   return { total: users.length, start, users: users.slice(start, start + pageSize) };
 }
 
 // 部署の選択肢です。表示順・部署コードの順で返します。
-export async function listDepartmentOptions() {
+export async function listDepartmentOptions(): Promise<DepartmentOption[]> {
   await getAdmin();
-  return db
-    .select({ id: department.id, name: department.name })
-    .from(department)
-    .orderBy(asc(department.sortOrder), asc(department.code));
+  return departments.listDepartmentOptions(await getContext());
 }
 
 // ユーザーの詳細です。見つからなければ、見つからない画面を表示します。
-export async function getUser(sub: string) {
+export async function getUser(sub: string): Promise<UserDetail> {
   await getAdmin();
   const output = await cognito.send(new AdminGetUserCommand({ UserPoolId: userPoolId, Username: sub })).catch((error) => {
     if (error instanceof UserNotFoundException) {
@@ -94,7 +107,7 @@ export async function getUser(sub: string) {
     throw error;
   });
   const memberships = await db
-    .select({ departmentId: userMembership.departmentId, role: userMembership.role, isAdmin: userMembership.isAdmin })
+    .select({ sub: userMembership.sub, departmentId: userMembership.departmentId, role: userMembership.role, isAdmin: userMembership.isAdmin })
     .from(userMembership)
     .where(eq(userMembership.sub, sub));
   return {
@@ -106,15 +119,6 @@ export async function getUser(sub: string) {
     membership: memberships.at(0) ?? null,
   };
 }
-
-// ユーザーの一覧の1行の型です。
-export type UserRow = Awaited<ReturnType<typeof listUsers>>['users'][number];
-
-// 部署の選択肢の1件の型です。
-export type DepartmentOption = Awaited<ReturnType<typeof listDepartmentOptions>>[number];
-
-// ユーザーの詳細の型です。
-export type UserDetail = Awaited<ReturnType<typeof getUser>>;
 
 // 所属（部署・ロール・全体管理者）を登録または更新します。作成者・更新者はログイン中の利用者です。
 export async function saveMembership(values: z.infer<typeof membershipSchema>) {

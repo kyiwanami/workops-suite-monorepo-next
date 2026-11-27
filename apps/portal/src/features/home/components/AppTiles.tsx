@@ -1,11 +1,11 @@
 import { Empty, EmptyHeader, EmptyTitle } from '@workops/ui/components/empty';
 import { ExternalLink } from 'lucide-react';
-import type { listHomeApps } from '@/server/home/data';
+import type { AppRow } from '@/server/apps/data';
 import { AppIcon } from './AppIcon';
 
 // アプリごとのタイルです。上部を押すとアプリを、下に並ぶページの行を押すとそのページを、別タブで開きます。
 // 1つの対象に押し場所は1つだけにします。
-export function AppTiles({ apps }: { apps: Awaited<ReturnType<typeof listHomeApps>> }) {
+export function AppTiles({ apps }: { apps: AppRow[] }) {
   if (apps.length === 0) {
     return (
       <Empty>

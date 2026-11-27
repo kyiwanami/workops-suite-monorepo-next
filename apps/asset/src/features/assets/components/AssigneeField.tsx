@@ -8,7 +8,7 @@ import { cn } from '@workops/ui/lib/utils';
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { useState } from 'react';
 import type { ControllerFieldState } from 'react-hook-form';
-import type { Member } from '@/server/assets/data';
+import type { Member } from '@workops/schema/assets';
 
 // 担当者の選択です。部署の有効な利用者を名前・メールで検索して選びます。先頭の「未割当」で担当者を外せます。
 // 名前が未設定の利用者は名前の欄にメールが入るため、メールの行を重ねて出しません。

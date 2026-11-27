@@ -7,7 +7,7 @@ import { isSpecType } from '@modelcontextprotocol/client';
 import { listAppUrls } from '@workops/domain/apps';
 import { createDatabase } from '@workops/domain/database';
 import { closeToolRequests, listToolApprovals, recordToolDecisions, recordToolRequests, recordToolResult } from '@workops/domain/tool-approvals';
-import { chatSchema } from '@workops/schema/chat';
+import { chatSchema, dataPartSchemas } from '@workops/schema/chat';
 import { nameTools, writeTools } from '@workops/schema/tools';
 import {
   convertToModelMessages,
@@ -23,7 +23,6 @@ import {
   type ToolSet,
   type TypedToolCall,
   type UIMessageStreamWriter,
-  type UIMessage,
 } from 'ai';
 import type { APIGatewayProxyWithCognitoAuthorizerEvent } from 'aws-lambda';
 import { Hono } from 'hono';
@@ -31,7 +30,7 @@ import { cors } from 'hono/cors';
 import { validator } from 'hono/validator';
 import { connectGateway, exchangeToken, gatewayPrefix, listGatewayTools } from './gateway';
 import { createHarnessModel } from './harness';
-import { listConversations, listEvents, pendingToolUses, sessionId, toMessages, toUIMessages } from './memory';
+import { type ChatMessage, listConversations, listEvents, pendingToolUses, sessionId, toMessages, toUIMessages } from './memory';
 
 const bedrock = new BedrockRuntimeClient({ region: env.AWS_REGION });
 const db = createDatabase({
@@ -115,7 +114,7 @@ app.post(
   }),
   async (c) => {
     const { id: conversationId, message: body } = c.req.valid('json');
-    const validated = await safeValidateUIMessages({ messages: [body] });
+    const validated = await safeValidateUIMessages<ChatMessage>({ messages: [body], dataSchemas: dataPartSchemas });
     const message = validated.success ? validated.data.at(0) : undefined;
     // AI SDK のメッセージでなければ 400
     if (message === undefined) {
@@ -128,7 +127,7 @@ app.post(
 );
 
 // 受け付けたメッセージと、送った利用者です。
-type ChatRequest = { sub: string; conversationId: string; userToken: string; message: UIMessage };
+type ChatRequest = { sub: string; conversationId: string; userToken: string; message: ChatMessage };
 
 // 利用者の依頼を Harness に渡す
 async function acceptRequest({ sub, conversationId, userToken, message }: ChatRequest) {
@@ -136,20 +135,24 @@ async function acceptRequest({ sub, conversationId, userToken, message }: ChatRe
   if (await isAttack(sub, conversationId, message)) {
     return Response.json({ message: messages.blocked }, { status: 400 });
   }
-  const prepared = await prepare(userToken);
   const pending = pendingToolUses(toMessages(await listEvents(sub, conversationId)));
+  const prepared = await prepare(userToken);
   // 判断待ちのカードがなければ、依頼だけ渡す
   if (pending.length === 0) {
     return converse({ sub, conversationId, ...prepared, message, prompts: [message] });
   }
   // 判断待ちのカードは実行しない。abandoned にし、実行していない結果を依頼の前に付ける（結果がないと Harness が再開できない）
+  // 準備のあとに記録する（準備に失敗しても判断待ちのまま残る）。記録に失敗したら接続を閉じる
   await closeToolRequests(
     db,
     sub,
     pending.map((toolUse) => toolUse.toolUseId),
     'abandoned',
-  );
-  const abandoned: UIMessage = {
+  ).catch(async (error) => {
+    await prepared.gateway.close();
+    throw error;
+  });
+  const abandoned: ChatMessage = {
     id: generateId(),
     role: 'assistant',
     parts: pending.map((toolUse) => ({
@@ -165,7 +168,7 @@ async function acceptRequest({ sub, conversationId, userToken, message }: ChatRe
 }
 
 // Bedrock Guardrails でプロンプト攻撃を調べる。検知したら種類と信頼度をログに出す
-async function isAttack(sub: string, conversationId: string, message: UIMessage) {
+async function isAttack(sub: string, conversationId: string, message: ChatMessage) {
   const text = message.parts
     .filter(isTextUIPart)
     .map((part) => part.text)
@@ -201,13 +204,16 @@ async function acceptDecisions({ sub, conversationId, userToken, message }: Chat
     );
     return Response.json({ message: messages.conflict }, { status: 409 });
   }
-  // 準備は判断の記録より前に済ませる（失敗しても判断待ちのまま残る）
+  // 準備は判断の記録より前に済ませる（失敗しても判断待ちのまま残る）。記録に失敗したら接続を閉じる
   const prepared = await prepare(userToken);
   const recorded = await recordToolDecisions(
     db,
     sub,
     decisions.map(({ toolUse, approval }) => ({ toolUseId: toolUse.toolUseId, status: approval.approved ? 'approved' : 'denied' })),
-  );
+  ).catch(async (error) => {
+    await prepared.gateway.close();
+    throw error;
+  });
   // 判断済みのカードへの2回目の判断は 409（二重実行を防ぐ）
   if (!recorded) {
     await prepared.gateway.close();
@@ -216,7 +222,7 @@ async function acceptDecisions({ sub, conversationId, userToken, message }: Chat
   for (const { toolUse, approval } of decisions) {
     log({ sub, conversationId, event: 'decision', tool: toolUse.name, toolUseId: toolUse.toolUseId, decision: approval.approved ? 'approved' : 'denied' });
   }
-  const prompt: UIMessage = {
+  const prompt: ChatMessage = {
     id: message.id,
     role: 'assistant',
     parts: decisions.map(({ toolUse, approval }) => ({
@@ -233,7 +239,7 @@ async function acceptDecisions({ sub, conversationId, userToken, message }: Chat
 }
 
 // 画面の判断を、会話の判断待ちの呼び出しと組にする
-function matchDecisions(events: Event[], message: UIMessage) {
+function matchDecisions(events: Event[], message: ChatMessage) {
   const pending = pendingToolUses(toMessages(events));
   const approvals = new Map(message.parts.filter(isToolUIPart).flatMap((part) => (part.state === 'approval-responded' ? [[part.toolCallId, part.approval]] : [])));
   const decisions = pending.flatMap((toolUse) => {
@@ -282,8 +288,9 @@ async function readTarget(gateway: MCPClient, toolCall: TypedToolCall<ToolSet>) 
   if (!args.success) {
     return null;
   }
-  const result = await callTool(gateway, target.tool, args.data);
-  return result?.structuredContent ?? null;
+  // 対象の値の形でなければ null
+  const value = dataPartSchemas.target.safeParse((await callTool(gateway, target.tool, args.data))?.structuredContent);
+  return value.success ? value.data : null;
 }
 
 // 確認カードの入力の ID の項目の名前を、利用者として読み取りのツールで引く
@@ -329,7 +336,7 @@ async function recordCards(input: {
   sub: string;
   conversationId: string;
   gateway: MCPClient;
-  writer: UIMessageStreamWriter;
+  writer: UIMessageStreamWriter<ChatMessage>;
   toolCalls: Array<TypedToolCall<ToolSet>>;
 }) {
   const { sub, conversationId, gateway, writer } = input;
@@ -370,8 +377,8 @@ async function recordCards(input: {
 async function converse(input: {
   sub: string;
   conversationId: string;
-  message: UIMessage;
-  prompts: UIMessage[];
+  message: ChatMessage;
+  prompts: ChatMessage[];
   token: string;
   gateway: MCPClient;
   readTools: string[];
@@ -384,7 +391,7 @@ async function converse(input: {
     log({ sub, conversationId, event: 'invoke', error: 'failed' });
     return messages.failed;
   };
-  const stream = createUIMessageStream({
+  const stream = createUIMessageStream<ChatMessage>({
     originalMessages: [input.message],
     generateId,
     onError: (error) => {
@@ -396,7 +403,7 @@ async function converse(input: {
         model: createHarnessModel({ token, runtimeSessionId: sessionId(sub, conversationId), actorId: sub, readTools }),
         messages: prompt,
         tools,
-        // 読み取りのツール（MCP の readOnlyHint が true）は承認なしで、それ以外は利用者の承認を求めます。AI SDK の文書の MCP のツールの承認の例と同じ判定です。
+        // 読み取りのツール（MCP の readOnlyHint が true）は承認なしで、それ以外は利用者の承認を求めます。Harness に渡す読み取りのツールの名前で判定します。
         toolApproval: ({ toolCall }) => (readTools.includes(toolCall.toolName) ? 'not-applicable' : 'user-approval'),
         // 承認を求めた呼び出しの確認カードを記録する
         onStepEnd: ({ content }) =>

@@ -3,7 +3,7 @@
 import { Input } from '@workops/ui/components/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@workops/ui/components/select';
 import { useQueryStates } from 'nuqs';
-import type { Option } from '@/server/assets/data';
+import type { AssetTypeOption, DepartmentOption } from '@workops/schema/assets';
 import { assetStatusBadges } from '@workops/ui/lib/labels';
 import { assetStatus } from '@workops/schema/assets';
 import { assetSearchParams } from '../search-params';
@@ -14,7 +14,7 @@ const all = 'all';
 // 資産の一覧の検索と絞り込みです。検索語は Enter で、状態・種別・部署は選んだ時点で反映します。
 // 部署の絞り込みは、部署の選択肢を渡したとき（全体管理者）だけ出します。
 // 条件は URL に持ち、サーバーで一覧を読み直します。条件を変えたら1ページ目に戻し、保存した旨の表示を消します。
-export function AssetFilters({ assetTypes, departments }: { assetTypes: Option[]; departments: Option[] | null }) {
+export function AssetFilters({ assetTypes, departments }: { assetTypes: AssetTypeOption[]; departments: DepartmentOption[] | null }) {
   const [params, setParams] = useQueryStates(assetSearchParams, { shallow: false });
   return (
     <div className="flex flex-wrap gap-3">
@@ -25,7 +25,7 @@ export function AssetFilters({ assetTypes, departments }: { assetTypes: Option[]
           void setParams({ q: String(new FormData(event.currentTarget).get('q')) || null, page: null, done: null });
         }}
       >
-        <Input name="q" type="search" placeholder="名称・担当者で検索" defaultValue={params.q ?? ''} />
+        <Input key={params.q} name="q" type="search" placeholder="名称・担当者で検索" defaultValue={params.q ?? ''} />
       </form>
       <Select
         value={params.status ?? all}

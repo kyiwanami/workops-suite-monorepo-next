@@ -7,7 +7,6 @@ import { loadDepartmentSearchParams } from '@/features/departments/search-params
 import { DepartmentTable } from '@/features/departments/components/DepartmentTable';
 import { listDepartments } from '@/server/departments/data';
 
-// 部署の一覧と、登録・編集・削除です。
 // 登録・保存・削除して戻ったときの文言です。
 const doneMessages = {
   created: '部署を登録しました',
@@ -15,6 +14,7 @@ const doneMessages = {
   deleted: '部署を削除しました',
 };
 
+// 部署の一覧と、登録・編集・削除です。
 export default async function DepartmentsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const { done } = await loadDepartmentSearchParams(searchParams);
   const departments = await listDepartments();

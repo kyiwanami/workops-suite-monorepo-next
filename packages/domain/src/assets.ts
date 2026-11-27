@@ -2,13 +2,13 @@ import { asset, assetType, department, userMembership } from '@workops/blocks/sc
 import { and, asc, count, desc, eq, ilike, inArray, or } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Context } from './context';
-import { BusinessError } from './errors';
+import { BusinessError, notFoundError, roleError } from './errors';
 import { hasRole, type Membership } from './membership';
-import { listUsers } from './users';
-import type { AssetConditions, AssetDetail, AssetList, assetSchema, AssetTypeOption } from '@workops/schema/assets';
+import { getUserName, listUsers } from './users';
+import type { AssetConditions, AssetDetail, AssetList, assetSchema, AssetStatus, AssetTypeOption } from '@workops/schema/assets';
 
 // 一覧の1ページの件数です。
-export const pageSize = 20;
+const pageSize = 20;
 
 // 利用者が扱える資産の条件です。全体管理者はすべての部署、それ以外は自部署の資産だけを扱えます。
 const departmentScope = (member: Membership) => (member.isAdmin ? undefined : eq(asset.departmentId, member.departmentId));
@@ -22,13 +22,20 @@ export async function listAssetTypeOptions(context: Context): Promise<AssetTypeO
 }
 
 // 部署に所属する有効な利用者です。担当者の選択肢に使います。名前の順で返します。
-export async function listMembers(context: Context, departmentIds: string[]) {
+// 部署を指定しないときは、全体管理者はすべての部署、それ以外は自部署の利用者です。扱えない部署を指定したときは空です。
+export async function listMembers(context: Context, departmentId: string | null) {
+  const { db, member } = context;
   const [users, memberships] = await Promise.all([
     listUsers(context),
-    context.db
+    db
       .select({ sub: userMembership.sub, departmentId: userMembership.departmentId })
       .from(userMembership)
-      .where(inArray(userMembership.departmentId, departmentIds)),
+      .where(
+        and(
+          member.isAdmin ? undefined : eq(userMembership.departmentId, member.departmentId),
+          departmentId === null ? undefined : eq(userMembership.departmentId, departmentId),
+        ),
+      ),
   ]);
   const usersBySub = new Map(users.filter((user) => user.enabled).map((user) => [user.sub, user]));
   return memberships
@@ -59,7 +66,8 @@ export async function listAssets(context: Context, conditions: AssetConditions):
     conditions.status === null ? undefined : eq(asset.status, conditions.status),
     conditions.type === null ? undefined : eq(asset.assetTypeId, conditions.type),
   );
-  const start = (conditions.page - 1) * pageSize;
+  // 1 より前のページは1ページ目として扱う
+  const start = (Math.max(conditions.page, 1) - 1) * pageSize;
   const [counts, rows] = await Promise.all([
     db.select({ total: count() }).from(asset).where(where),
     db
@@ -111,8 +119,7 @@ export async function getAsset(context: Context, id: string): Promise<AssetDetai
   if (row === undefined) {
     return null;
   }
-  const assignee = row.assigneeSub === null ? undefined : (await listUsers(context)).find((user) => user.sub === row.assigneeSub);
-  return { ...row, assigneeName: assignee?.name ?? null };
+  return { ...row, assigneeName: row.assigneeSub === null ? null : await getUserName(context, row.assigneeSub) };
 }
 
 // 担当者が、部署の有効な利用者か未割当であることを確かめます。
@@ -120,18 +127,18 @@ async function checkAssignee(context: Context, departmentId: string, assigneeSub
   if (assigneeSub === null) {
     return;
   }
-  const members = await listMembers(context, [departmentId]);
+  const members = await listMembers(context, departmentId);
   if (!members.some((member) => member.sub === assigneeSub)) {
     throw new BusinessError('担当者は、部署の有効な利用者から選んでください。');
   }
 }
 
-// 資産を登録し、登録した資産の ID を返します。担当者以上でなければ null を返します。
+// 資産を登録し、登録した資産の ID を返します。担当者以上が使えます。
 // 全体管理者は選んだ部署、それ以外は自部署に登録します。作成者・更新者は操作する利用者です。
 export async function createAsset(context: Context, values: z.infer<typeof assetSchema>) {
   const { db, member } = context;
   if (!hasRole(member, 'editor')) {
-    return null;
+    throw roleError();
   }
   const departmentId = member.isAdmin ? values.departmentId : member.departmentId;
   await checkAssignee(context, departmentId, values.assigneeSub);
@@ -153,15 +160,15 @@ export async function createAsset(context: Context, values: z.infer<typeof asset
   return created[0].id;
 }
 
-// 資産を更新し、true を返します。部署は変えません。担当者以上でないか、扱える資産でなければ null を返します。
+// 資産を更新し、資産の ID を返します。部署は変えません。担当者以上が、扱える資産に使えます。
 export async function updateAsset(context: Context, id: string, values: z.infer<typeof assetSchema>) {
   const { db, member } = context;
   if (!hasRole(member, 'editor')) {
-    return null;
+    throw roleError();
   }
   const current = await getAsset(context, id);
   if (current === null) {
-    return null;
+    throw notFoundError();
   }
   await checkAssignee(context, current.departmentId, values.assigneeSub);
   await db
@@ -175,18 +182,18 @@ export async function updateAsset(context: Context, id: string, values: z.infer<
       updatedBy: member.sub,
     })
     .where(eq(asset.id, current.id));
-  return true;
+  return current.id;
 }
 
-// 資産の状態を変えます。変える前と後の状態を返します。担当者以上でないか、扱える資産でなければ null を返します。
-export async function changeStatus(context: Context, id: string, status: typeof asset.$inferSelect['status']) {
+// 資産の状態を変えます。変える前と後の状態を返します。担当者以上が、扱える資産に使えます。
+export async function changeStatus(context: Context, id: string, status: AssetStatus) {
   const { db, member } = context;
   if (!hasRole(member, 'editor')) {
-    return null;
+    throw roleError();
   }
   const current = await getAsset(context, id);
   if (current === null) {
-    return null;
+    throw notFoundError();
   }
   await db
     .update(asset)
@@ -195,15 +202,15 @@ export async function changeStatus(context: Context, id: string, status: typeof 
   return { from: current.status, to: status };
 }
 
-// 資産を削除し、true を返します。承認者以上でないか、扱える資産でなければ null を返します。
+// 資産を削除し、資産の ID を返します。承認者以上が、扱える資産に使えます。
 export async function deleteAsset(context: Context, id: string) {
   if (!hasRole(context.member, 'manager')) {
-    return null;
+    throw roleError();
   }
   const current = await getAsset(context, id);
   if (current === null) {
-    return null;
+    throw notFoundError();
   }
   await context.db.delete(asset).where(eq(asset.id, current.id));
-  return true;
+  return current.id;
 }

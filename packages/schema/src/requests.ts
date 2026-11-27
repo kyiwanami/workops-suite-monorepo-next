@@ -12,8 +12,7 @@ export const requestSchema = z.object({
     .nullable()
     .meta({ title: '説明', description: '申請の説明' }),
   requestTypeId: z
-    .string()
-    .min(1, '申請種別を選んでください。')
+    .uuid('申請種別を選んでください。')
     .meta({ title: '申請種別', description: '申請種別のID。有効な種別だけを選べる' }),
   amount: z
     .number({ error: '金額は整数で入力してください。' })
@@ -31,25 +30,25 @@ export const reasonSchema = z.object({
 });
 
 // 申請の一覧のタブです。すべて・自分が承認するもの・自分の申請です。
-export const requestTabs = ['all', 'approve', 'mine'] as const;
+export const requestTab = z.enum(['all', 'approve', 'mine']);
 
 // 申請の一覧の期間です。作成日時が今月・先月のもの、またはすべてです。
-export const requestPeriods = ['thisMonth', 'lastMonth', 'all'] as const;
+export const requestPeriod = z.enum(['thisMonth', 'lastMonth', 'all']);
 
 // 申請の一覧の検索条件です。画面ではURLのクエリ文字列から作ります。
 export const requestConditionsSchema = z.object({
-  tab: z.enum(requestTabs).meta({ description: 'all：すべて、approve：自分が承認するもの（承認者以上）、mine：自分の申請' }),
+  tab: requestTab.meta({ description: 'all：すべて、approve：自分が承認するもの（承認者以上）、mine：自分の申請' }),
   q: z
     .string()
     .nullable()
     .meta({ description: '件名、または申請者の名前・メールの部分一致' }),
   type: z
-    .string()
+    .uuid()
     .nullable()
     .meta({ description: '申請種別のID' }),
-  period: z.enum(requestPeriods).meta({ description: '作成日時の期間。thisMonth：今月、lastMonth：先月、all：すべて' }),
+  period: requestPeriod.meta({ description: '作成日時の期間。thisMonth：今月、lastMonth：先月、all：すべて' }),
   department: z
-    .string()
+    .uuid()
     .nullable()
     .meta({ description: '部署のID。全体管理者だけに効く' }),
   page: z
@@ -67,13 +66,37 @@ export const requestStatus = z
   .enum(['draft', 'submitted', 'approved', 'rejected', 'withdrawn'])
   .meta({ description: '申請の状態。draft：下書き、submitted：提出済み、approved：承認済み、rejected：却下済み、withdrawn：取下げ済み' });
 
+// 申請の一覧の1件です。
+export const requestItemSchema = z.object({
+  id: z.string().meta({ description: '申請のID' }),
+  title: z.string().meta({ description: '申請の件名' }),
+  status: requestStatus,
+  amount: z
+    .number()
+    .int()
+    .nullable()
+    .meta({ description: '金額（円）' }),
+  requesterSub: z.string().meta({ description: '申請者の利用者識別子' }),
+  requesterName: z
+    .string()
+    .nullable()
+    .meta({ description: '申請者の名前' }),
+  requestTypeName: z.string().meta({ description: '申請種別の名前' }),
+  departmentName: z.string().meta({ description: '部署の名前' }),
+  submittedAt: z
+    .string()
+    .nullable()
+    .meta({ description: '提出日時。未提出なら null' }),
+});
+
+// 申請の一覧のタブごとの件数です。
+export const requestCountsSchema = z.object({ all: z.number().int(), approve: z.number().int(), mine: z.number().int() });
+
 // 申請の一覧です。タブごとの件数と、このページの申請を返します。
 export const requestListSchema = z.object({
-  tab: z.enum(requestTabs).meta({ description: '表示したタブ。承認者でなければ approve は all になる' }),
+  tab: requestTab.meta({ description: '表示したタブ。承認者でなければ approve は all になる' }),
   canApprove: z.boolean().meta({ description: '自分が承認するもののタブを使えるか' }),
-  counts: z
-    .object({ all: z.number().int(), approve: z.number().int(), mine: z.number().int() })
-    .meta({ description: 'タブごとの件数' }),
+  counts: requestCountsSchema.meta({ description: 'タブごとの件数' }),
   total: z
     .number()
     .int()
@@ -82,29 +105,7 @@ export const requestListSchema = z.object({
     .number()
     .int()
     .meta({ description: 'このページの先頭の位置（0から）' }),
-  requests: z.array(
-    z.object({
-      id: z.string().meta({ description: '申請のID' }),
-      title: z.string().meta({ description: '申請の件名' }),
-      status: requestStatus,
-      amount: z
-        .number()
-        .int()
-        .nullable()
-        .meta({ description: '金額（円）' }),
-      requesterSub: z.string().meta({ description: '申請者の利用者識別子' }),
-      requesterName: z
-        .string()
-        .nullable()
-        .meta({ description: '申請者の名前' }),
-      requestTypeName: z.string().meta({ description: '申請種別の名前' }),
-      departmentName: z.string().meta({ description: '部署の名前' }),
-      submittedAt: z
-        .string()
-        .nullable()
-        .meta({ description: '提出日時。未提出なら null' }),
-    }),
-  ),
+  requests: z.array(requestItemSchema),
 });
 
 // 申請の詳細です。
@@ -171,6 +172,17 @@ export const requestOperationsSchema = z.object({
   return: z.boolean().meta({ description: '差し戻せるか' }),
 });
 
+// 申請の操作の遷移先の状態です。編集は下書きのまま、削除は申請を消すため null です。
+export const requestTransitions = {
+  update: 'draft',
+  submit: 'submitted',
+  withdraw: 'withdrawn',
+  delete: null,
+  approve: 'approved',
+  reject: 'rejected',
+  return: 'draft',
+} satisfies Record<keyof z.infer<typeof requestOperationsSchema>, z.infer<typeof requestStatus> | null>;
+
 // 申請の作成・編集で選べる申請種別です。
 export const requestTypeOptionSchema = z.object({
   id: z.string().meta({ description: '申請種別のID' }),
@@ -188,14 +200,18 @@ export const requestUpdateSchema = requestSchema.extend(requestIdSchema.shape);
 // 申請の却下・差戻しの入力です。対象の申請と、理由です。
 export const requestReasonSchema = reasonSchema.extend(requestIdSchema.shape);
 
-// 申請の詳細と、利用者がその申請に対してできる操作です。
-export const requestWithOperationsSchema = requestDetailSchema.extend({ operations: requestOperationsSchema });
+// 申請の詳細と、利用者がその申請に対してAIのツールでできる操作です。削除のツールはないため、削除できるかは含めません。
+export const requestWithOperationsSchema = requestDetailSchema.extend({ operations: requestOperationsSchema.omit({ delete: true }) });
 
 // 申請の作成・編集で選べる申請種別の一覧です。
 export const requestTypeOptionsSchema = z.object({ requestTypes: z.array(requestTypeOptionSchema) });
 
 // 申請の一覧・詳細・できる操作・申請種別の選択肢の型です。
 export type RequestList = z.infer<typeof requestListSchema>;
+export type RequestItem = z.infer<typeof requestItemSchema>;
+export type RequestCounts = z.infer<typeof requestCountsSchema>;
+export type RequestStatus = z.infer<typeof requestStatus>;
+export type RequestPeriod = z.infer<typeof requestPeriod>;
 export type RequestDetail = z.infer<typeof requestDetailSchema>;
 export type RequestOperations = z.infer<typeof requestOperationsSchema>;
 export type RequestTypeOption = z.infer<typeof requestTypeOptionSchema>;

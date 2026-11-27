@@ -10,7 +10,8 @@ import type { ChatMessage } from './chat';
 import { HistoryIcon, PlusIcon, XIcon } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
-import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, type ReactNode, type RefObject, useContext, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { AiGlyph } from './ai-glyph';
 import { chatFetch } from './chat-fetch';
 
@@ -23,6 +24,8 @@ const PanelContext = createContext<{
   chatApiUrl: string;
   open: boolean;
   setOpen: (open: boolean) => void;
+  close: () => void;
+  launcherRef: RefObject<HTMLButtonElement | null>;
   chat: AiChat<ChatMessage>;
   openChat: (id: string, messages: ChatMessage[]) => void;
 } | null>(null);
@@ -41,6 +44,7 @@ function usePanel() {
 export function ChatProvider({ chatApiUrl, children }: { chatApiUrl: string; children: ReactNode }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const launcherRef = useRef<HTMLButtonElement>(null);
   const createChat = (id: string, messages: ChatMessage[]) =>
     new AiChat<ChatMessage>({
       id,
@@ -67,6 +71,12 @@ export function ChatProvider({ chatApiUrl, children }: { chatApiUrl: string; chi
         chatApiUrl,
         open,
         setOpen,
+        // 閉じて起動ボタンを出してから、起動ボタンにフォーカスを戻す
+        close: () => {
+          flushSync(() => setOpen(false));
+          launcherRef.current?.focus();
+        },
+        launcherRef,
         chat,
         // 替える前に今の会話の受け取りを止める（外から渡した会話は useChat が止めない）
         openChat: (id, messages) => {
@@ -80,25 +90,15 @@ export function ChatProvider({ chatApiUrl, children }: { chatApiUrl: string; chi
   );
 }
 
-// 画面右下の「AIに頼む」ボタンです。パネルを開いている間は隠し、閉じたらこのボタンにフォーカスを戻します。
+// 画面右下の「AIに頼む」ボタンです。パネルを開いている間は隠します。
 // 丸いアイコンだけにはしません。サポート窓口のチャットと誤認されず、AIで業務を操作できると伝わるようにするためです。
 export function ChatLauncher() {
-  const { open, setOpen } = usePanel();
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const wasOpen = useRef(false);
-  useEffect(() => {
-    if (wasOpen.current && !open) {
-      buttonRef.current?.focus();
-    }
-    wasOpen.current = open;
-  }, [open]);
-  if (open) {
-    return null;
-  }
+  const { open, setOpen, launcherRef } = usePanel();
   return (
     <button
-      ref={buttonRef}
+      ref={launcherRef}
       type="button"
+      hidden={open}
       onClick={() => setOpen(true)}
       className="fixed right-6 bottom-6 z-30 inline-flex h-11 items-center gap-2 rounded-full bg-card pr-3 pl-4 text-sm font-bold text-foreground shadow-panel outline-ring focus-visible:outline-2 focus-visible:outline-offset-2"
     >
@@ -111,7 +111,7 @@ export function ChatLauncher() {
 // パネルの中身です。見出し（AIの印・会話の一覧・新しい会話・閉じる）、会話、会話の一覧です。
 // 一覧を見ている間も進めている会話を残すため、会話は隠すだけにします。
 function PanelBody() {
-  const { chatApiUrl, setOpen, chat, openChat } = usePanel();
+  const { chatApiUrl, close, chat, openChat } = usePanel();
   const [listing, setListing] = useState(false);
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -133,7 +133,7 @@ function PanelBody() {
           <PlusIcon />
           <span className="sr-only">新しい会話</span>
         </Button>
-        <Button variant="ghost" size="icon" onClick={() => setOpen(false)}>
+        <Button variant="ghost" size="icon" onClick={close}>
           <XIcon />
           <span className="sr-only">閉じる</span>
         </Button>
@@ -159,14 +159,12 @@ function PanelBody() {
 // - 1280px 未満：一覧の列が詰まって読めなくならないよう、ページの上に重ねます
 // - スマートフォン：下から全画面のシートで開きます
 export function ChatPanel() {
-  const { open, setOpen } = usePanel();
+  const { open, close } = usePanel();
   const mobile = useIsMobile();
   const [opened, setOpened] = useState(false);
-  useEffect(() => {
-    if (open) {
-      setOpened(true);
-    }
-  }, [open]);
+  if (open && !opened) {
+    setOpened(true);
+  }
 
   // 一度開くまでは描きません。閉じたあとは、会話を残すため隠すだけにします。
   if (!opened) {
@@ -174,7 +172,7 @@ export function ChatPanel() {
   }
   if (mobile) {
     return (
-      <Sheet open={open} onOpenChange={setOpen}>
+      <Sheet open={open} onOpenChange={(next) => !next && close()}>
         <SheetContent side="bottom" showCloseButton={false} className="gap-0 bg-card p-0 data-[side=bottom]:h-svh">
           <SheetTitle className="sr-only">AIアシスタント</SheetTitle>
           <PanelBody />

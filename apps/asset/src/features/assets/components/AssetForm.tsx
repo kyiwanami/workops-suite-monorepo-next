@@ -20,7 +20,7 @@ import Link from 'next/link';
 import { unstable_rethrow } from 'next/navigation';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { createAssetAction, updateAssetAction } from '@/server/assets/actions';
-import type { AssetDetail, Member, Option } from '@/server/assets/data';
+import type { AssetDetail, AssetTypeOption, DepartmentOption, Member } from '@workops/schema/assets';
 import { formatDateTime, assetStatusBadges } from '@workops/ui/lib/labels';
 import { assetSchema, assetStatus } from '@workops/schema/assets';
 import { AssigneeField } from './AssigneeField';
@@ -37,8 +37,8 @@ export function AssetForm({
 }: {
   asset: AssetDetail | null;
   departmentId: string;
-  departments: Option[] | null;
-  assetTypes: Option[];
+  departments: DepartmentOption[] | null;
+  assetTypes: AssetTypeOption[];
   members: Member[];
 }) {
   const form = useForm({

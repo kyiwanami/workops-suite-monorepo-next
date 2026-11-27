@@ -46,9 +46,16 @@ export async function changeStatusAction(id: string, status: z.infer<typeof asse
   return changed;
 }
 
-// 資産を削除し、一覧へ戻ります。
+// 資産を削除し、削除した旨を出す一覧へ戻ります。業務のルールで削除できなければ、その文言を返します。
 export async function deleteAssetAction(formData: FormData) {
-  await deleteAsset(String(formData.get('id')));
+  try {
+    await deleteAsset(z.uuid().parse(formData.get('id')));
+  } catch (error) {
+    if (error instanceof BusinessError) {
+      return error.message;
+    }
+    throw error;
+  }
   revalidatePath('/assets');
   redirect(serializeAssetSearchParams('/assets', { done: 'deleted' }));
 }

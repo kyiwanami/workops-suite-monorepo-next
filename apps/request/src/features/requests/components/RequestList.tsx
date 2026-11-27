@@ -3,15 +3,15 @@ import { Card, CardContent } from '@workops/ui/components/card';
 import { Empty, EmptyHeader, EmptyTitle } from '@workops/ui/components/empty';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@workops/ui/components/table';
 import Link from 'next/link';
-import type { RequestRow } from '@/server/requests/data';
+import type { RequestItem } from '@workops/schema/requests';
 import { formatAmount, formatDateTime, requestStatusBadges } from '@workops/ui/lib/labels';
 
 // 提出日時の表示です。未提出は「—」です。
-const submittedAt = (item: RequestRow) => (item.submittedAt === null ? '—' : formatDateTime(item.submittedAt));
+const submittedAt = (item: RequestItem) => (item.submittedAt === null ? '—' : formatDateTime(item.submittedAt));
 
 // 申請の一覧です。広い画面は表、狭い画面は Card を並べます。件名を押すと詳細を開き、狭い画面ではカード全体が詳細へのリンクです。
 // 全体管理者には部署を出します。
-export function RequestList({ requests, showDepartment }: { requests: RequestRow[]; showDepartment: boolean }) {
+export function RequestList({ requests, showDepartment }: { requests: RequestItem[]; showDepartment: boolean }) {
   if (requests.length === 0) {
     return (
       <Empty>

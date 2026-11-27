@@ -4,7 +4,7 @@ import { createAssetType } from '@workops/domain/asset-types';
 import { createAsset, deleteAsset, getAsset, listAssets, listAssetTypeOptions, listMembers, updateAsset } from '@workops/domain/assets';
 import type { Context } from '@workops/domain/context';
 import { listDepartmentOptions } from '@workops/domain/departments';
-import { BusinessError } from '@workops/domain/errors';
+import { BusinessError, notFoundError } from '@workops/domain/errors';
 import { getMembership } from '@workops/domain/membership';
 import {
   approveRequest,
@@ -19,15 +19,13 @@ import {
   updateRequest,
   withdrawRequest,
 } from '@workops/domain/requests';
-import { assetTypeSchema } from '@workops/schema/asset-types';
+import { assetTypeIdSchema } from '@workops/schema/asset-types';
 import {
   assetConditionsSchema,
   assetDetailSchema,
   assetIdSchema,
   assetListSchema,
-  assetSchema,
   assetTypeOptionsSchema,
-  assetUpdateSchema,
   departmentOptionsSchema,
   membersSchema,
 } from '@workops/schema/assets';
@@ -35,16 +33,14 @@ import {
   requestConditionsSchema,
   requestIdSchema,
   requestListSchema,
-  requestReasonSchema,
-  requestSchema,
   requestTypeOptionsSchema,
-  requestUpdateSchema,
   requestWithOperationsSchema,
 } from '@workops/schema/requests';
+import { writeToolCards } from '@workops/schema/tools';
 import { cognito, db, userPoolId } from './connections';
 
 // ツールの処理を、呼び出した利用者として実行します。利用者は Gateway のインターセプターが `_meta` に入れた識別子です。
-// 対象が見つからない・権限がないときは null が返るため、同じ文言で失敗にします。
+// 読み取りで対象が見つからないときは null が返るため、失敗にします。
 // 投げた例外は、SDK がその文言で失敗の結果にします。業務のエラーではない例外は、内容をログだけに出し、決まった文言にします。
 // 結果は構造化した値と、その JSON の文字列の両方で返します。ツール結果の検知は文字列の結果を読みます。
 async function run<T extends JSONObject>(
@@ -62,7 +58,7 @@ async function run<T extends JSONObject>(
     }
     const result = await operate({ db, cognito, userPoolId, member });
     if (result === null) {
-      throw new BusinessError('対象が見つからないか、操作する権限がありません。');
+      throw notFoundError();
     }
     return { content: [{ type: 'text', text: JSON.stringify(result) }], structuredContent: result };
   } catch (error) {
@@ -72,11 +68,6 @@ async function run<T extends JSONObject>(
     console.error(JSON.stringify({ event: 'toolError', sub, error: String(error) }));
     throw new Error('処理に失敗しました。', { cause: error });
   }
-}
-
-// 操作した対象を返します。業務の処理が null を返したときは null のままにします。
-async function target<T>(output: T, operated: Promise<true | null>) {
-  return (await operated) === null ? null : output;
 }
 
 // 業務の処理をAIのツールとして公開する MCP サーバーを作ります。要求ごとに作ります。
@@ -129,11 +120,7 @@ export function createServer() {
       outputSchema: departmentOptionsSchema,
       annotations: read,
     },
-    (ctx) =>
-      run(ctx, async (context) => {
-        const departments = await listDepartmentOptions(context);
-        return { departments: context.member.isAdmin ? departments : departments.filter((item) => item.id === context.member.departmentId) };
-      }),
+    (ctx) => run(ctx, async (context) => ({ departments: await listDepartmentOptions(context) })),
   );
 
   server.registerTool(
@@ -144,11 +131,7 @@ export function createServer() {
       outputSchema: membersSchema,
       annotations: read,
     },
-    (ctx) =>
-      run(ctx, async (context) => {
-        const departmentIds = context.member.isAdmin ? (await listDepartmentOptions(context)).map((item) => item.id) : [context.member.departmentId];
-        return { members: await listMembers(context, departmentIds) };
-      }),
+    (ctx) => run(ctx, async (context) => ({ members: await listMembers(context, null) })),
   );
 
   server.registerTool(
@@ -156,15 +139,11 @@ export function createServer() {
     {
       title: '資産の登録',
       description: '資産を登録します。担当者以上が使えます。資産の担当者は、部署の有効な利用者から選びます。',
-      inputSchema: assetSchema,
+      inputSchema: writeToolCards['create-asset'].input,
       outputSchema: assetIdSchema,
       annotations: create,
     },
-    (args, ctx) =>
-      run(ctx, async (context) => {
-        const assetId = await createAsset(context, args);
-        return assetId === null ? null : { assetId };
-      }),
+    (args, ctx) => run(ctx, async (context) => ({ assetId: await createAsset(context, args) })),
   );
 
   server.registerTool(
@@ -172,14 +151,11 @@ export function createServer() {
     {
       title: '資産の編集',
       description: '資産の内容を更新します。担当者以上が使えます。資産の担当者は、部署の有効な利用者から選びます。',
-      inputSchema: assetUpdateSchema,
+      inputSchema: writeToolCards['update-asset'].input,
       outputSchema: assetIdSchema,
       annotations: change,
     },
-    (args, ctx) => {
-      const { assetId, ...values } = args;
-      return run(ctx, (context) => target({ assetId }, updateAsset(context, assetId, values)));
-    },
+    (args, ctx) => run(ctx, async (context) => ({ assetId: await updateAsset(context, args.assetId, args) })),
   );
 
   server.registerTool(
@@ -187,11 +163,11 @@ export function createServer() {
     {
       title: '資産の削除',
       description: '資産を削除します。承認者以上が使えます。削除した資産は元に戻せません。',
-      inputSchema: assetIdSchema,
+      inputSchema: writeToolCards['delete-asset'].input,
       outputSchema: assetIdSchema,
       annotations: change,
     },
-    (args, ctx) => run(ctx, (context) => target({ assetId: args.assetId }, deleteAsset(context, args.assetId))),
+    (args, ctx) => run(ctx, async (context) => ({ assetId: await deleteAsset(context, args.assetId) })),
   );
 
   server.registerTool(
@@ -199,18 +175,11 @@ export function createServer() {
     {
       title: '資産種別の登録',
       description: '資産種別を登録します。承認者以上が使えます。コードは、ほかの資産種別と重複できません。',
-      inputSchema: assetTypeSchema,
-      outputSchema: assetTypeSchema,
+      inputSchema: writeToolCards['create-asset-type'].input,
+      outputSchema: assetTypeIdSchema,
       annotations: create,
     },
-    (args, ctx) =>
-      run(ctx, async (context) => {
-        const created = await createAssetType(context, args);
-        if (created === false) {
-          throw new BusinessError('このコードはすでに使われています。別のコードを入力してください。');
-        }
-        return created === null ? null : args;
-      }),
+    (args, ctx) => run(ctx, async (context) => ({ assetTypeId: await createAssetType(context, args) })),
   );
 
   server.registerTool(
@@ -237,7 +206,8 @@ export function createServer() {
     (args, ctx) =>
       run(ctx, async (context) => {
         const found = await getRequest(context, args.requestId);
-        return found === null ? null : { ...found, operations: getOperations(context.member, found) };
+        // 削除のツールはないため、できる操作から削除を外す
+        return found === null ? null : requestWithOperationsSchema.parse({ ...found, operations: getOperations(context.member, found) });
       }),
   );
 
@@ -257,7 +227,7 @@ export function createServer() {
     {
       title: '申請の作成',
       description: '申請を下書きで作成します。担当者以上が使えます。提出は submit-request で行います。',
-      inputSchema: requestSchema,
+      inputSchema: writeToolCards['create-request'].input,
       outputSchema: requestIdSchema,
       annotations: create,
     },
@@ -269,14 +239,11 @@ export function createServer() {
     {
       title: '申請の編集',
       description: '申請の内容を更新します。担当者以上が、自分の下書きの申請に対して使えます。',
-      inputSchema: requestUpdateSchema,
+      inputSchema: writeToolCards['update-request'].input,
       outputSchema: requestIdSchema,
       annotations: change,
     },
-    (args, ctx) => {
-      const { requestId, ...values } = args;
-      return run(ctx, (context) => target({ requestId }, updateRequest(context, requestId, values)));
-    },
+    (args, ctx) => run(ctx, async (context) => ({ requestId: await updateRequest(context, args.requestId, args) })),
   );
 
   server.registerTool(
@@ -284,11 +251,11 @@ export function createServer() {
     {
       title: '申請の提出',
       description: '下書きの申請を提出します。担当者以上が、自分の下書きの申請に対して使えます。',
-      inputSchema: requestIdSchema,
+      inputSchema: writeToolCards['submit-request'].input,
       outputSchema: requestIdSchema,
       annotations: change,
     },
-    (args, ctx) => run(ctx, (context) => target({ requestId: args.requestId }, submitRequest(context, args.requestId))),
+    (args, ctx) => run(ctx, async (context) => ({ requestId: await submitRequest(context, args.requestId) })),
   );
 
   server.registerTool(
@@ -296,11 +263,11 @@ export function createServer() {
     {
       title: '申請の取下げ',
       description: '申請を取り下げます。担当者以上が、自分の下書きか提出済みの申請に対して使えます。',
-      inputSchema: requestIdSchema,
+      inputSchema: writeToolCards['withdraw-request'].input,
       outputSchema: requestIdSchema,
       annotations: change,
     },
-    (args, ctx) => run(ctx, (context) => target({ requestId: args.requestId }, withdrawRequest(context, args.requestId))),
+    (args, ctx) => run(ctx, async (context) => ({ requestId: await withdrawRequest(context, args.requestId) })),
   );
 
   server.registerTool(
@@ -308,11 +275,11 @@ export function createServer() {
     {
       title: '申請の承認',
       description: '提出済みの申請を承認します。承認者以上が、自分以外の申請に対して使えます。',
-      inputSchema: requestIdSchema,
+      inputSchema: writeToolCards['approve-request'].input,
       outputSchema: requestIdSchema,
       annotations: change,
     },
-    (args, ctx) => run(ctx, (context) => target({ requestId: args.requestId }, approveRequest(context, args.requestId))),
+    (args, ctx) => run(ctx, async (context) => ({ requestId: await approveRequest(context, args.requestId) })),
   );
 
   server.registerTool(
@@ -320,12 +287,11 @@ export function createServer() {
     {
       title: '申請の却下',
       description: '提出済みの申請を、理由を付けて却下します。承認者以上が、自分以外の申請に対して使えます。',
-      inputSchema: requestReasonSchema,
+      inputSchema: writeToolCards['reject-request'].input,
       outputSchema: requestIdSchema,
       annotations: change,
     },
-    (args, ctx) =>
-      run(ctx, (context) => target({ requestId: args.requestId }, rejectRequest(context, args.requestId, args.reason))),
+    (args, ctx) => run(ctx, async (context) => ({ requestId: await rejectRequest(context, args.requestId, args.reason) })),
   );
 
   server.registerTool(
@@ -333,12 +299,11 @@ export function createServer() {
     {
       title: '申請の差戻し',
       description: '提出済みの申請を、理由を付けて申請者に差し戻します。承認者以上が、自分以外の申請に対して使えます。',
-      inputSchema: requestReasonSchema,
+      inputSchema: writeToolCards['return-request'].input,
       outputSchema: requestIdSchema,
       annotations: change,
     },
-    (args, ctx) =>
-      run(ctx, (context) => target({ requestId: args.requestId }, returnRequest(context, args.requestId, args.reason))),
+    (args, ctx) => run(ctx, async (context) => ({ requestId: await returnRequest(context, args.requestId, args.reason) })),
   );
 
   return server;

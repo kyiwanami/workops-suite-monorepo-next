@@ -107,7 +107,6 @@ export function createAiBackend(props: {
   const tokenExchangeClient = userPool.addClient('TokenExchangeClient', {
     generateSecret: true,
     oAuth: { flows: { clientCredentials: true }, scopes: [props.chatScope] },
-    accessTokenValidity: Duration.minutes(60),
   });
   const tokenExchangeClientResource = tokenExchangeClient.node.defaultChild;
   assert(tokenExchangeClientResource instanceof CfnUserPoolClient);
@@ -260,7 +259,15 @@ export function createAiBackend(props: {
   createPolicies({ stack, policyEngine, gateway, target });
 
   // チャットの経路です。チャットのAPIの処理は、登録されたアプリのURLを共有の Aurora から読みます。
-  const chat = createChatBackend({ stack, userPool, gateway, tokenExchangeClient, tokenExchangeSecret, chatFunction: props.chatFunction });
+  const chat = createChatBackend({
+    stack,
+    userPool,
+    gateway,
+    tokenExchangeClient,
+    tokenExchangeSecret,
+    chatFunction: props.chatFunction,
+    chatScope: props.chatScope.scopeName,
+  });
   cluster.grantDataApiAccess(props.chatFunction);
 
   // AI機能のアラームです。
@@ -320,8 +327,8 @@ export function createAiBackend(props: {
         MEMORY_ID: chat.memory.memoryId,
         GUARDRAIL_ID: chat.guardrail.attrGuardrailId,
         GUARDRAIL_VERSION: chat.guardrailVersion.attrVersion,
-        CREDENTIAL_PROVIDER_NAME: chat.credentialProvider.name,
-        CREDENTIAL_PROVIDER_ARN: chat.credentialProvider.attrCredentialProviderArn,
+        CREDENTIAL_PROVIDER_NAME: chat.credentialProvider.oAuth2CredentialProviderName,
+        CREDENTIAL_PROVIDER_ARN: chat.credentialProvider.credentialProviderArn,
         WORKLOAD_NAME: chat.workloadIdentity.workloadIdentityName,
         HARNESS_IDLE_TIMEOUT: String(chat.idleRuntimeSessionTimeout),
       },

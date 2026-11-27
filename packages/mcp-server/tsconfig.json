@@ -1,17 +1,11 @@
 {
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2022",
-    "lib": ["esnext"],
-    "module": "esnext",
-    "moduleResolution": "bundler",
-    "strict": true,
-    "strictNullChecks": true,
-    "exactOptionalPropertyTypes": true,
-    "noEmit": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "skipLibCheck": true,
-    "types": ["node"]
+    "types": [
+      "node"
+    ]
   },
-  "include": ["./src/**/*.ts"]
+  "include": [
+    "./src/**/*.ts"
+  ]
 }

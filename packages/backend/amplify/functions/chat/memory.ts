@@ -10,10 +10,15 @@ import {
 } from '@aws-sdk/client-bedrock-agentcore';
 import type { JSONObject } from '@ai-sdk/provider';
 import type { toolApproval } from '@workops/blocks/schema';
-import type { UIMessage } from 'ai';
+import { dataPartSchemas } from '@workops/schema/chat';
+import type { InferUIDataParts, UIMessage } from 'ai';
+import { contentText } from './harness';
 import { z } from 'zod';
 
 const agentCore = new BedrockAgentCoreClient({ region: env.AWS_REGION });
+
+// 会話のメッセージです。確認カードに添えるデータパートの型を付けます。
+export type ChatMessage = UIMessage<never, InferUIDataParts<typeof dataPartSchemas>>;
 
 // Harness が会話のイベントに JSON の文字列で記録する発話です。保存の形式は公開されていないため、SDK の発話の型に合うことを検証して読みます。
 const recordSchema = z.object({
@@ -96,7 +101,7 @@ export function toUIMessages(
   const results = new Map(
     messages.flatMap((message) => message.content ?? []).flatMap((block) => (block.toolResult?.toolUseId === undefined ? [] : [[block.toolResult.toolUseId, block.toolResult]])),
   );
-  const uiMessages: UIMessage[] = [];
+  const uiMessages: ChatMessage[] = [];
   messages.forEach((message, index) => {
     const content = message.content ?? [];
     // 利用者の依頼
@@ -106,7 +111,7 @@ export function toUIMessages(
     }
     // AIの発話とツールの結果は、直前のAIのメッセージにまとめる
     const last = uiMessages.at(-1);
-    const assistant: UIMessage = last?.role === 'assistant' ? last : { id: `${index}`, role: 'assistant', parts: [] };
+    const assistant: ChatMessage = last?.role === 'assistant' ? last : { id: `${index}`, role: 'assistant', parts: [] };
     if (assistant !== last) {
       uiMessages.push(assistant);
     }
@@ -125,7 +130,7 @@ export function toUIMessages(
 
 // ツールの呼び出しを部品にして足す。状態はツールの結果と確認カードの記録で決める
 function pushToolParts(
-  assistant: UIMessage,
+  assistant: ChatMessage,
   toolUse: HarnessToolUseBlock,
   history: {
     results: Map<string, HarnessToolResultBlock>;
@@ -150,7 +155,7 @@ function pushToolParts(
     providerExecuted: history.readTools.has(name),
     ...(toolMetadata === undefined ? {} : { toolMetadata }),
   };
-  const output = (result?.content ?? []).map((item) => item.text ?? JSON.stringify(item.json)).join('');
+  const output = contentText(result?.content ?? []);
   const status = approval?.status;
   if (result === undefined) {
     // 判断待ち
@@ -158,12 +163,17 @@ function pushToolParts(
   } else if (status === 'denied' || status === 'abandoned') {
     // やめた・判断せずに次の依頼をした
     assistant.parts.push({ type: 'dynamic-tool', ...common, state: 'output-denied', approval: { id: toolUseId, approved: false } });
-  } else if (status === 'failed' || result.status === 'error') {
-    // 失敗
-    assistant.parts.push({ type: 'dynamic-tool', ...common, state: 'output-error', errorText: output });
+  } else if (history.readTools.has(name)) {
+    // 読み取りのツールの結果は、Harness のストリームと同じく文にする
+    assistant.parts.push(
+      result.status === 'error'
+        ? { type: 'dynamic-tool', ...common, state: 'output-error', errorText: output }
+        : { type: 'dynamic-tool', ...common, state: 'output-available', output },
+    );
   } else {
-    // 成功
-    assistant.parts.push({ type: 'dynamic-tool', ...common, state: 'output-available', output });
+    // 書込みのツールの結果は、AI SDK が実行したときと同じく MCP のツールの結果の形にする
+    const isError = status === 'failed' || result.status === 'error';
+    assistant.parts.push({ type: 'dynamic-tool', ...common, state: 'output-available', output: { content: [{ type: 'text', text: output }], isError } });
   }
 
   // 記録がない（読み取りのツール）
@@ -171,15 +181,18 @@ function pushToolParts(
     return;
   }
   // 変更前の表示に使う対象の値
-  if (approval.target !== null) {
-    assistant.parts.push({ type: 'data-target', id: toolUseId, data: approval.target });
+  const target = dataPartSchemas.target.safeParse(approval.target);
+  if (target.success) {
+    assistant.parts.push({ type: 'data-target', id: toolUseId, data: target.data });
   }
   // ID の代わりに出す名前
-  if (approval.names !== null) {
-    assistant.parts.push({ type: 'data-names', id: toolUseId, data: approval.names });
+  const names = dataPartSchemas.names.safeParse(approval.names);
+  if (names.success) {
+    assistant.parts.push({ type: 'data-names', id: toolUseId, data: names.data });
   }
   // 実行を終えたカードの日時
   if (status === 'succeeded' || status === 'failed') {
-    assistant.parts.push({ type: 'data-result', id: toolUseId, data: { at: approval.updatedAt } });
+    // DB の日時の文字列を、逐次の応答と同じ ISO の形にする
+    assistant.parts.push({ type: 'data-result', id: toolUseId, data: { at: new Date(approval.updatedAt).toISOString() } });
   }
 }

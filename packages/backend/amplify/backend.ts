@@ -11,7 +11,6 @@ import {
   UserPool,
   UserPoolOperation,
 } from 'aws-cdk-lib/aws-cognito';
-import { PolicyStatement } from 'aws-cdk-lib/aws-iam';
 import { createAiBackend } from './ai';
 import { chat } from './functions/chat/resource';
 import { gatewayInterceptor } from './functions/gateway-interceptor/resource';
@@ -53,13 +52,8 @@ const resourceServer = userPool.addResourceServer('ResourceServer', {
 // トークンを作る前に、利用者のロールと全体管理者区分をアクセストークンに入れます。所属は共有の Aurora から読みます。
 app.preTokenGeneration.addEnvironment('DATABASE_NAME', database.databaseName);
 app.preTokenGeneration.addEnvironment('SECRET_ARN', database.secretArn);
-app.preTokenGeneration.addEnvironment('CLUSTER_ARN', database.clusterArn);
-app.preTokenGeneration.resources.lambda.addToRolePolicy(
-  new PolicyStatement({ actions: ['rds-data:ExecuteStatement'], resources: [database.clusterArn] }),
-);
-app.preTokenGeneration.resources.lambda.addToRolePolicy(
-  new PolicyStatement({ actions: ['secretsmanager:GetSecretValue'], resources: [database.secretArn] }),
-);
+app.preTokenGeneration.addEnvironment('CLUSTER_ARN', database.cluster.clusterArn);
+database.cluster.grantDataApiAccess(app.preTokenGeneration.resources.lambda);
 userPool.addTrigger(
   UserPoolOperation.PRE_TOKEN_GENERATION_CONFIG,
   app.preTokenGeneration.resources.lambda,
@@ -85,7 +79,7 @@ for (const [name, value] of Object.entries({
   ...ai.chat.environment,
   DATABASE_NAME: database.databaseName,
   SECRET_ARN: database.secretArn,
-  CLUSTER_ARN: database.clusterArn,
+  CLUSTER_ARN: database.cluster.clusterArn,
 })) {
   app.chat.addEnvironment(name, value);
 }
@@ -94,7 +88,7 @@ for (const [name, value] of Object.entries({
 app.addOutput({
   auth: { aws_region: stack.region, user_pool_id: userPool.userPoolId },
   custom: {
-    database: { clusterArn: database.clusterArn, secretArn: database.secretArn, databaseName: database.databaseName },
+    database: { clusterArn: database.cluster.clusterArn, secretArn: database.secretArn, databaseName: database.databaseName },
     authDomain: `workops-${prefix}.auth.${stack.region}.amazoncognito.com`,
     gatewayUrl: ai.gatewayUrl,
     chatApiUrl: ai.chat.apiUrl,

@@ -21,7 +21,7 @@ export async function updateDepartmentAction(id: string, input: z.infer<typeof d
 
 // 部署を削除し、削除した旨を出す一覧へ戻ります。所属・資産・申請が残っていて削除できなければ、その旨を返します。
 export async function deleteDepartmentAction(formData: FormData) {
-  if (!(await deleteDepartment(String(formData.get('id'))))) {
+  if (!(await deleteDepartment(z.uuid().parse(formData.get('id'))))) {
     return '削除できませんでした。この部署の所属・資産・申請が残っています。';
   }
   revalidatePath('/admin/departments');

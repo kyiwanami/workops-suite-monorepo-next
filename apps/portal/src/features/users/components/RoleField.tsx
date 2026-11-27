@@ -18,7 +18,7 @@ export function RoleField({
   return (
     <FieldSet data-invalid={fieldState.invalid}>
       <FieldLegend variant="label">ロール</FieldLegend>
-      <RadioGroup name="role" value={value} onValueChange={onChange}>
+      <RadioGroup value={value} onValueChange={onChange}>
         {roles.map((role) => (
           <Field key={role.value} orientation="horizontal">
             <RadioGroupItem id={`role-${role.value}`} value={role.value} />

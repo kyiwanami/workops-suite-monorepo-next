@@ -3,7 +3,7 @@
 import { Input } from '@workops/ui/components/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@workops/ui/components/select';
 import { useQueryStates } from 'nuqs';
-import type { DepartmentOption } from '@/server/users/data';
+import type { DepartmentOption } from '@workops/schema/assets';
 import { statusBadges } from '../labels';
 import { accountStatus } from '../schema';
 import { userSearchParams } from '../search-params';
@@ -24,7 +24,7 @@ export function UserFilters({ departments }: { departments: DepartmentOption[] }
           void setParams({ q: String(new FormData(event.currentTarget).get('q')) || null, page: null, done: null });
         }}
       >
-        <Input name="q" type="search" placeholder="名前・メールで検索" defaultValue={params.q ?? ''} />
+        <Input key={params.q} name="q" type="search" placeholder="名前・メールで検索" defaultValue={params.q ?? ''} />
       </form>
       <Select
         value={params.department ?? all}

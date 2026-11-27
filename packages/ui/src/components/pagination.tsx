@@ -5,6 +5,7 @@ import { Button } from "@workops/ui/components/button"
 import { ChevronLeftIcon, ChevronRightIcon, MoreHorizontalIcon } from "lucide-react"
 import Link from "next/link"
 
+// shadcn/ui の原本から、リンクを next/link に、アイコンを lucide-react の部品に変えています。
 function Pagination({ className, ...props }: React.ComponentProps<"nav">) {
   return (
     <nav

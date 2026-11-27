@@ -21,8 +21,8 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { unstable_rethrow } from 'next/navigation';
 import { Controller, useForm } from 'react-hook-form';
-import { createUserAction } from '@/server/users/actions';
-import type { DepartmentOption } from '@/server/users/data';
+import { createUserAction, type CreateUserResult } from '@/server/users/actions';
+import type { DepartmentOption } from '@workops/schema/assets';
 import { userSchema } from '../schema';
 import { DepartmentField } from './DepartmentField';
 import { RoleField } from './RoleField';
@@ -34,7 +34,7 @@ function CreateUserForm({
   onCreated,
 }: {
   departments: DepartmentOption[];
-  onCreated: (output: Awaited<ReturnType<typeof createUserAction>>) => void;
+  onCreated: (output: CreateUserResult) => void;
 }) {
   const form = useForm({
     resolver: zodResolver(userSchema),
@@ -111,7 +111,7 @@ function CreateUserForm({
 // 名前・メール・部署・ロールを1つのダイアログで入力し、作成と所属の設定を1回で行います。
 export function CreateUser({ departments }: { departments: DepartmentOption[] }) {
   const [open, setOpen] = useState(false);
-  const [created, setCreated] = useState<Awaited<ReturnType<typeof createUserAction>> | null>(null);
+  const [created, setCreated] = useState<CreateUserResult | null>(null);
   return (
     <>
       <PageHeader title="ユーザー">

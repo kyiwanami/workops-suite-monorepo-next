@@ -7,7 +7,6 @@ import { loadAppSearchParams } from '@/features/apps/search-params';
 import { AppList } from '@/features/apps/components/AppList';
 import { listApps } from '@/server/apps/data';
 
-// アプリと配下のページの一覧と、登録・編集・削除です。
 // 登録・保存・削除して戻ったときの文言です。
 const doneMessages = {
   appCreated: 'アプリを登録しました',
@@ -18,6 +17,7 @@ const doneMessages = {
   pageDeleted: 'ページを削除しました',
 };
 
+// アプリと配下のページの一覧と、登録・編集・削除です。
 export default async function AppsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const { done } = await loadAppSearchParams(searchParams);
   const apps = await listApps();

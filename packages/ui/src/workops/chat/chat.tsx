@@ -16,7 +16,7 @@ import {
 } from '@workops/ui/components/message-scroller';
 import { Spinner } from '@workops/ui/components/spinner';
 import type { dataPartSchemas } from '@workops/schema/chat';
-import { type InferUIDataParts, isDynamicToolUIPart, isTextUIPart, type UIMessage } from 'ai';
+import { type InferUIDataParts, isDataUIPart, isDynamicToolUIPart, isTextUIPart, type UIMessage } from 'ai';
 import { SendIcon } from 'lucide-react';
 import { type FormEvent, useRef, useState } from 'react';
 import { Streamdown } from 'streamdown';
@@ -93,9 +93,10 @@ export function Chat({ chat }: { chat: AiChat<ChatMessage> }) {
                         }
                         if (part.type === 'dynamic-tool') {
                           // BFF が添えた、カードを表示した時点の対象の値と、入力の ID の項目の名前と、実行の日時です。
-                          const target = message.parts.flatMap((item) => (item.type === 'data-target' && item.id === part.toolCallId ? [item.data] : [])).at(0);
-                          const names = message.parts.flatMap((item) => (item.type === 'data-names' && item.id === part.toolCallId ? [item.data] : [])).at(0);
-                          const resultAt = message.parts.flatMap((item) => (item.type === 'data-result' && item.id === part.toolCallId ? [item.data.at] : [])).at(0);
+                          const data = message.parts.filter(isDataUIPart).filter((item) => item.id === part.toolCallId);
+                          const target = data.find((item) => item.type === 'data-target')?.data;
+                          const names = data.find((item) => item.type === 'data-names')?.data;
+                          const resultAt = data.find((item) => item.type === 'data-result')?.data.at;
                           return <ToolPart key={part.toolCallId} part={part} target={target} names={names} resultAt={resultAt} onRespond={addToolApprovalResponse} />;
                         }
                         return null;

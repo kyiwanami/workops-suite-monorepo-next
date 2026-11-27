@@ -1,12 +1,13 @@
-import type { AssetDetail } from '@workops/schema/assets';
-import type { RequestDetail } from '@workops/schema/requests';
-import type { Badge } from '@workops/ui/components/badge';
-import { tz } from '@date-fns/tz';
-import { format } from 'date-fns';
-import type { ComponentProps } from 'react';
+import type { AssetStatus } from '@workops/schema/assets';
+import type { RequestStatus } from '@workops/schema/requests';
+import type { badgeVariants } from '@workops/ui/components/badge';
+import type { VariantProps } from 'class-variance-authority';
+
+// 表示名と、Badge の見た目の種類です。
+export type BadgeStyle = { label: string } & VariantProps<typeof badgeVariants>;
 
 // 資産の状態の表示名と、Badge の色の種類です。資産カタログの画面とAIの確認カードで使います。
-export const assetStatusBadges: Record<AssetDetail['status'], { label: string; variant: ComponentProps<typeof Badge>['variant'] }> = {
+export const assetStatusBadges: Record<AssetStatus, BadgeStyle> = {
   inStock: { label: '在庫中', variant: 'success' },
   lent: { label: '貸出中', variant: 'info' },
   inRepair: { label: '修理中', variant: 'warning' },
@@ -14,7 +15,7 @@ export const assetStatusBadges: Record<AssetDetail['status'], { label: string; v
 };
 
 // 申請の状態の表示名と、Badge の色の種類です。申請管理の画面とAIの確認カードで使います。
-export const requestStatusBadges: Record<RequestDetail['status'], { label: string; variant: ComponentProps<typeof Badge>['variant'] }> = {
+export const requestStatusBadges: Record<RequestStatus, BadgeStyle> = {
   draft: { label: '下書き', variant: 'secondary' },
   submitted: { label: '提出済み', variant: 'info' },
   approved: { label: '承認済み', variant: 'success' },
@@ -22,8 +23,18 @@ export const requestStatusBadges: Record<RequestDetail['status'], { label: strin
   withdrawn: { label: '取下げ済み', variant: 'outline' },
 };
 
-// DB の日時の文字列を、日本時間の「2026/11/05 09:20」の形にします。
-export const formatDateTime = (value: string) => format(new Date(value), 'yyyy/MM/dd HH:mm', { in: tz('Asia/Tokyo') });
+// 日時の書式です。日本時間の「2026/11/05 09:20」の形にします。
+const dateTimeFormat = new Intl.DateTimeFormat('ja-JP', {
+  timeZone: 'Asia/Tokyo',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
+// 日時を、日本時間の「2026/11/05 09:20」の形にします。
+export const formatDateTime = (value: string | Date) => dateTimeFormat.format(new Date(value));
 
 // 金額の書式です。円記号を半角の「¥」にするため、英語・日本の設定で通貨の書式にします。
 const amountFormat = new Intl.NumberFormat('en-JP', { style: 'currency', currency: 'JPY' });

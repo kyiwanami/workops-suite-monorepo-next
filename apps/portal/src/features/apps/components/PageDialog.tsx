@@ -130,7 +130,6 @@ function PageForm({
               <FieldLegend variant="label">必要なロール</FieldLegend>
               {/* 必要なロールが未設定のページは全員が見られるため、未設定を「全員」の選択肢で表します。 */}
               <RadioGroup
-                name={field.name}
                 value={field.value ?? 'all'}
                 onValueChange={(value) => field.onChange(value === 'all' ? null : value)}
               >

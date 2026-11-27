@@ -1,21 +1,20 @@
 import {
   createLoader,
   createSerializer,
-  type inferParserType,
   parseAsBoolean,
   parseAsInteger,
   parseAsString,
   parseAsStringLiteral,
 } from 'nuqs/server';
-import { requestPeriods, requestTabs } from '@workops/schema/requests';
+import { requestPeriod, requestTab } from '@workops/schema/requests';
 
 // 申請の一覧の検索条件です。URL に持ち、画面とサーバーの両方で同じ形で読み書きします。
 // done は、申請を保存・操作して一覧へ戻ったことと、その操作を表します。
 export const requestSearchParams = {
-  tab: parseAsStringLiteral(requestTabs).withDefault('all'),
+  tab: parseAsStringLiteral(requestTab.options).withDefault('all'),
   q: parseAsString,
   type: parseAsString,
-  period: parseAsStringLiteral(requestPeriods).withDefault('thisMonth'),
+  period: parseAsStringLiteral(requestPeriod.options).withDefault('thisMonth'),
   department: parseAsString,
   page: parseAsInteger.withDefault(1),
   done: parseAsStringLiteral(['saved', 'submitted', 'withdrawn', 'deleted', 'approved', 'rejected', 'returned']),
@@ -35,6 +34,3 @@ export const loadRequestDetailSearchParams = createLoader(requestDetailSearchPar
 
 // 詳細の条件から詳細の URL を作ります。
 export const serializeRequestDetailSearchParams = createSerializer(requestDetailSearchParams);
-
-// 読んだ検索条件の型です。
-export type RequestSearchParams = inferParserType<typeof requestSearchParams>;

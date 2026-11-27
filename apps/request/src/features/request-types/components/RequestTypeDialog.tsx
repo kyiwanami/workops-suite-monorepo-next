@@ -21,7 +21,7 @@ import { type ReactNode, useState } from 'react';
 import { unstable_rethrow, useRouter } from 'next/navigation';
 import { Controller, useForm } from 'react-hook-form';
 import { createRequestTypeAction, deleteRequestTypeAction, updateRequestTypeAction } from '@/server/request-types/actions';
-import type { RequestTypeRow } from '@/server/request-types/data';
+import type { RequestTypeRow } from '@workops/domain/request-types';
 import { requestTypeSchema } from '@workops/schema/request-types';
 import { serializeRequestTypeSearchParams } from '../search-params';
 

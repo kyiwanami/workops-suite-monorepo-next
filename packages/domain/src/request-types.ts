@@ -1,14 +1,22 @@
 import { request, requestType } from '@workops/blocks/schema';
 import { and, asc, count, eq, notExists } from 'drizzle-orm';
-import type { z } from 'zod';
+import { createSelectSchema } from 'drizzle-orm/zod';
+import { z } from 'zod';
 import type { Context } from './context';
+import { roleError } from './errors';
 import { hasRole } from './membership';
 import type { requestTypeSchema } from '@workops/schema/request-types';
 
-// 申請種別を表示順・コードの順で全件返します。その種別を使っている申請の件数を一緒に返します。承認者以上でなければ null を返します。
-export async function listRequestTypes(context: Context) {
+// 申請種別の一覧の1件です。DB の申請種別の列と、その種別を使っている申請の件数です。
+export const requestTypeRowSchema = createSelectSchema(requestType)
+  .pick({ id: true, code: true, name: true, description: true, isActive: true, sortOrder: true })
+  .extend({ requestCount: z.number() });
+export type RequestTypeRow = z.infer<typeof requestTypeRowSchema>;
+
+// 申請種別を表示順・コードの順で全件返します。その種別を使っている申請の件数を一緒に返します。承認者以上が使えます。
+export async function listRequestTypes(context: Context): Promise<RequestTypeRow[]> {
   if (!hasRole(context.member, 'manager')) {
-    return null;
+    throw roleError();
   }
   return context.db
     .select({
@@ -35,11 +43,11 @@ const columns = (values: z.infer<typeof requestTypeSchema>) => ({
 });
 
 // 申請種別を登録し、登録した申請種別の ID を返します。新しい種別は有効です。作成者・更新者は操作する利用者です。
-// 承認者以上でなければ null を返します。
+// 承認者以上が使えます。
 export async function createRequestType(context: Context, values: z.infer<typeof requestTypeSchema>) {
   const { db, member } = context;
   if (!hasRole(member, 'manager')) {
-    return null;
+    throw roleError();
   }
   const now = new Date().toISOString();
   const created = await db
@@ -49,23 +57,22 @@ export async function createRequestType(context: Context, values: z.infer<typeof
   return created[0].id;
 }
 
-// 申請種別を更新し、true を返します。コードも変えられます。承認者以上でなければ null を返します。
+// 申請種別を更新します。コードも変えられます。承認者以上が使えます。
 export async function updateRequestType(context: Context, id: string, values: z.infer<typeof requestTypeSchema>) {
   const { db, member } = context;
   if (!hasRole(member, 'manager')) {
-    return null;
+    throw roleError();
   }
   await db
     .update(requestType)
     .set({ ...columns(values), updatedAt: new Date().toISOString(), updatedBy: member.sub })
     .where(eq(requestType.id, id));
-  return true;
 }
 
-// 申請が使っていない申請種別を削除し、削除できたかを返します。承認者以上でなければ null を返します。
+// 申請が使っていない申請種別を削除し、削除できたかを返します。承認者以上が使えます。
 export async function deleteRequestType(context: Context, id: string) {
   if (!hasRole(context.member, 'manager')) {
-    return null;
+    throw roleError();
   }
   const { db } = context;
   const deleted = await db

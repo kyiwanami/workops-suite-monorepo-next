@@ -34,6 +34,9 @@ const tools = {
   ],
 };
 
+// 他の利用者が書いた自由記述（件名・説明・理由・資産名・種別の説明）を返す読み取りツールです。
+const freeTextTools = ['list-assets', 'get-asset', 'list-asset-types', 'list-requests', 'get-request', 'list-request-types'];
+
 // Gateway のツールの呼び出しを評価するポリシーです。
 // ポリシーはツールの定義で検証されるため、Gateway がターゲットからツールの定義を読んだあとに作ります。
 // JWT のクレームは Cedar ではタグになり、L2 の部品では読めないため、Cedar の文で書きます。
@@ -48,17 +51,21 @@ export function createPolicies(props: {
   const actions = (names: string[]) => names.map((name) => `AgentCore::Action::"workops___${name}"`).join(', ');
 
   // ロールごとのツールの許可です。
-  const roles = {
-    viewer: 'principal.hasTag("app_role")',
-    editor: 'principal.hasTag("app_role") && (principal.getTag("app_role") == "editor" || principal.getTag("app_role") == "manager")',
-    manager: 'principal.hasTag("app_role") && principal.getTag("app_role") == "manager"',
-  };
-  for (const role of ['viewer', 'editor', 'manager'] as const) {
+  const roles = [
+    { role: 'viewer', names: tools.viewer, condition: 'principal.hasTag("app_role")' },
+    {
+      role: 'editor',
+      names: tools.editor,
+      condition: 'principal.hasTag("app_role") && (principal.getTag("app_role") == "editor" || principal.getTag("app_role") == "manager")',
+    },
+    { role: 'manager', names: tools.manager, condition: 'principal.hasTag("app_role") && principal.getTag("app_role") == "manager"' },
+  ];
+  for (const { role, names, condition } of roles) {
     const policy = new Policy(stack, `Policy-${role}`, {
       policyEngine,
       policyName: role,
       statement: PolicyStatement.fromCedar(
-        `permit(principal is AgentCore::OAuthUser, action in [${actions(tools[role])}], resource == ${resource}) when { ${roles[role]} };`,
+        `permit(principal is AgentCore::OAuthUser, action in [${actions(names)}], resource == ${resource}) when { ${condition} };`,
       ),
     });
     policy.node.addDependency(target);
@@ -81,7 +88,7 @@ export function createPolicies(props: {
     definition: {
       policy: {
         statement: [
-          `suppressOutput(principal, action in [${actions(tools.viewer)}], resource == ${resource})`,
+          `suppressOutput(principal, action in [${actions(freeTextTools)}], resource == ${resource})`,
           'when guardrails {',
           '  BedrockGuardrails::PromptAttack(["PROMPT_INJECTION", "JAILBREAK"], ["$.result.content[*].text"])',
           '    .maxConfidenceScore().greaterThan(decimal("0.4"))',

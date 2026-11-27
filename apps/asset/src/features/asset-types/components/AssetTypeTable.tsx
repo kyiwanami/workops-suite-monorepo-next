@@ -1,6 +1,7 @@
+import { Button } from '@workops/ui/components/button';
 import { Empty, EmptyHeader, EmptyTitle } from '@workops/ui/components/empty';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@workops/ui/components/table';
-import type { AssetTypeRow } from '@/server/asset-types/data';
+import type { AssetTypeRow } from '@workops/domain/asset-types';
 import { AssetTypeDialog } from './AssetTypeDialog';
 
 // 資産種別の一覧表です。種別名を押すと編集のダイアログが開きます。
@@ -32,9 +33,9 @@ export function AssetTypeTable({ assetTypes }: { assetTypes: AssetTypeRow[] }) {
               <TableCell className="font-mono">{item.code}</TableCell>
               <TableCell>
                 <AssetTypeDialog assetType={item}>
-                  <button type="button" className="font-bold text-primary hover:underline">
+                  <Button variant="link" className="h-auto p-0 font-bold">
                     {item.name}
-                  </button>
+                  </Button>
                 </AssetTypeDialog>
               </TableCell>
               <TableCell className="hidden whitespace-normal text-muted-foreground md:table-cell">{item.description}</TableCell>

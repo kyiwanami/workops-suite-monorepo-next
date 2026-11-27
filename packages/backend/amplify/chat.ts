@@ -1,21 +1,12 @@
 import { Duration, Names, type Stack } from 'aws-cdk-lib';
 import { CfnGuardrail, CfnGuardrailVersion } from 'aws-cdk-lib/aws-bedrock';
-import { CfnHarness, CfnOAuth2CredentialProvider, type Gateway, Memory, WorkloadIdentity } from 'aws-cdk-lib/aws-bedrockagentcore';
+import { CfnHarness, type Gateway, Memory, OAuth2CredentialProvider, WorkloadIdentity } from 'aws-cdk-lib/aws-bedrockagentcore';
 import type { UserPool, UserPoolClient } from 'aws-cdk-lib/aws-cognito';
 import { PolicyStatement, Role, ServicePrincipal } from 'aws-cdk-lib/aws-iam';
 import type { IFunction } from 'aws-cdk-lib/aws-lambda';
 import { LogRetention, RetentionDays } from 'aws-cdk-lib/aws-logs';
 import type { Secret } from 'aws-cdk-lib/aws-secretsmanager';
-import {
-  AuthorizationType,
-  CognitoUserPoolsAuthorizer,
-  Cors,
-  EndpointType,
-  LambdaIntegration,
-  ResponseTransferMode,
-  ResponseType,
-  RestApi,
-} from 'aws-cdk-lib/aws-apigateway';
+import { AuthorizationType, CognitoUserPoolsAuthorizer, Cors, EndpointType, LambdaIntegration, type Resource, ResponseTransferMode, ResponseType, RestApi } from 'aws-cdk-lib/aws-apigateway';
 
 // Harness のセッションの待機の上限（秒）です。AgentCore Runtime の既定値に合わせます。
 const idleRuntimeSessionTimeout = 900;
@@ -33,7 +24,7 @@ const systemPrompt = [
 ].join('\n');
 
 // チャットの経路です。会話の記録、利用者の入力の検査、Gateway 用のトークンの交換、AIの実行の仕組み（Harness）を作ります。
-// チャットのAPIは、スコープ workops/chat と、利用者のトークンだけに入る principal_type で受け付けます。
+// チャットのAPIは、チャットのスコープと、利用者のトークンだけに入る principal_type で受け付けます。
 // Harness は、BFF が交換用のクライアントで交換したトークンだけを受け付けます。
 export function createChatBackend(props: {
   stack: Stack;
@@ -42,8 +33,10 @@ export function createChatBackend(props: {
   tokenExchangeClient: UserPoolClient;
   tokenExchangeSecret: Secret;
   chatFunction: IFunction;
+  // チャットのスコープの名前（workops/chat）
+  chatScope: string;
 }) {
-  const { stack, userPool, gateway } = props;
+  const { stack, userPool, gateway, chatScope } = props;
   const discoveryUrl = `https://cognito-idp.${stack.region}.amazonaws.com/${userPool.userPoolId}/.well-known/openid-configuration`;
 
   // 会話の記録です。長期の記憶は使わず、30日で消します。
@@ -66,8 +59,7 @@ export function createChatBackend(props: {
 
   // 利用者のトークンを、Gateway 用のトークンに交換する認証情報プロバイダーです。利用者になりすます形で交換します。
   // 交換用のクライアントのシークレットは、Secrets Manager から読ませます。
-  const credentialProvider = new CfnOAuth2CredentialProvider(stack, 'ChatCredentialProvider', {
-    name: `${Names.uniqueResourceName(stack, { maxLength: 40 })}-gateway`,
+  const credentialProvider = new OAuth2CredentialProvider(stack, 'ChatCredentialProvider', {
     credentialProviderVendor: 'CustomOauth2',
     oauth2ProviderConfigInput: {
       customOauth2ProviderConfig: {
@@ -92,7 +84,7 @@ export function createChatBackend(props: {
   role.addToPolicy(
     new PolicyStatement({
       actions: ['bedrock:InvokeModel', 'bedrock:InvokeModelWithResponseStream'],
-      resources: [`arn:${stack.partition}:bedrock:*::foundation-model/*`, arn('bedrock', '*')],
+      resources: [`arn:${stack.partition}:bedrock:*::foundation-model/*`, arn('bedrock', 'inference-profile/*')],
     }),
   );
   role.addToPolicy(new PolicyStatement({ actions: ['ecr-public:GetAuthorizationToken', 'sts:GetServiceBearerToken'], resources: ['*'] }));
@@ -115,7 +107,7 @@ export function createChatBackend(props: {
       resources: [arn('logs', 'log-group:/aws/bedrock-agentcore/runtimes/*:log-stream:*')],
     }),
   );
-  role.addToPolicy(new PolicyStatement({ actions: ['logs:PutResourcePolicy'], resources: ['*'] }));
+  role.addToPolicy(new PolicyStatement({ actions: ['logs:PutResourcePolicy'], resources: [arn('logs', 'log-group:/aws/bedrock-agentcore/runtimes/*')] }));
   role.addToPolicy(
     new PolicyStatement({
       actions: ['cloudwatch:PutMetricData'],
@@ -133,14 +125,10 @@ export function createChatBackend(props: {
   role.addToPolicy(
     new PolicyStatement({
       actions: ['bedrock-agentcore:GetResourceOauth2Token'],
-      resources: [
-        arn('bedrock-agentcore', 'token-vault/default'),
-        arn('bedrock-agentcore', 'workload-identity-directory/default'),
-        harnessWorkload,
-        credentialProvider.attrCredentialProviderArn,
-      ],
+      resources: [arn('bedrock-agentcore', 'workload-identity-directory/default'), harnessWorkload],
     }),
   );
+  credentialProvider.grant(role, 'bedrock-agentcore:GetResourceOauth2Token');
   props.tokenExchangeSecret.grantRead(role);
   memory.grant(
     role,
@@ -148,7 +136,6 @@ export function createChatBackend(props: {
     'bedrock-agentcore:DeleteEvent',
     'bedrock-agentcore:GetEvent',
     'bedrock-agentcore:ListEvents',
-    'bedrock-agentcore:RetrieveMemoryRecords',
   );
 
   // AIの実行の仕組みです。読み取りのツールは Gateway から交換したトークンで呼び、書込みのツールは呼び出しのたびに渡します。
@@ -166,8 +153,8 @@ export function createChatBackend(props: {
             gatewayArn: gateway.gatewayArn,
             outboundAuth: {
               oauth: {
-                providerArn: credentialProvider.attrCredentialProviderArn,
-                scopes: ['workops/chat'],
+                providerArn: credentialProvider.credentialProviderArn,
+                scopes: [chatScope],
                 grantType: 'TOKEN_EXCHANGE',
                 customParameters: { subject_token_type: 'urn:ietf:params:oauth:token-type:access_token' },
               },
@@ -190,7 +177,7 @@ export function createChatBackend(props: {
       customJwtAuthorizer: {
         discoveryUrl,
         allowedClients: [props.tokenExchangeClient.userPoolClientId],
-        allowedScopes: ['workops/chat'],
+        allowedScopes: [chatScope],
         customClaims: [
           {
             inboundTokenClaimName: 'principal_type',
@@ -218,39 +205,26 @@ export function createChatBackend(props: {
       resources: [guardrail.attrGuardrailArn, `arn:${stack.partition}:bedrock:*:${stack.account}:guardrail-profile/apac.guardrail.v1:0`],
     }),
   );
-  chatFunction.addToRolePolicy(
-    new PolicyStatement({
-      actions: ['bedrock-agentcore:GetWorkloadAccessTokenForJWT'],
-      resources: [arn('bedrock-agentcore', 'workload-identity-directory/default'), workloadIdentity.workloadIdentityArn],
-    }),
-  );
-  chatFunction.addToRolePolicy(
-    new PolicyStatement({
-      actions: ['bedrock-agentcore:GetResourceOauth2Token'],
-      resources: [
-        arn('bedrock-agentcore', 'token-vault/default'),
-        arn('bedrock-agentcore', 'workload-identity-directory/default'),
-        workloadIdentity.workloadIdentityArn,
-        credentialProvider.attrCredentialProviderArn,
-      ],
-    }),
-  );
+  workloadIdentity.grant(chatFunction, 'bedrock-agentcore:GetWorkloadAccessTokenForJWT', 'bedrock-agentcore:GetResourceOauth2Token');
+  credentialProvider.grant(chatFunction, 'bedrock-agentcore:GetResourceOauth2Token');
   props.tokenExchangeSecret.grantRead(chatFunction);
 
   // チャットのAPIです。逐次返すため、アイドルの上限が長い REGIONAL にし、Lambda の応答をストリーミングで返します。
-  // スコープ workops/chat を持つトークンだけを受け付け、利用者のトークンかどうかは BFF が principal_type で確かめます。
+  // チャットのスコープを持つトークンだけを受け付け、利用者のトークンかどうかは BFF が principal_type で確かめます。
   // オリジンの許可は BFF が登録されたアプリのURLで判定します。プリフライトとエラーの応答は固定の値しか返せないため、すべてのオリジンに返します。
   const api = new RestApi(stack, 'ChatApi', {
     endpointConfiguration: { types: [EndpointType.REGIONAL] },
     deployOptions: { throttlingRateLimit: 10, throttlingBurstLimit: 20 },
+    // アカウント共通の API Gateway のログ用ロールは作らない（ログを出す設定がない）
+    cloudWatchRole: false,
   });
   const authorizer = new CognitoUserPoolsAuthorizer(stack, 'ChatApiAuthorizer', { cognitoUserPools: [userPool] });
   const integration = new LambdaIntegration(chatFunction, { responseTransferMode: ResponseTransferMode.STREAM, timeout: Duration.minutes(6) });
-  const methods = (resource: ReturnType<RestApi['root']['addResource']>, httpMethod: 'GET' | 'POST') => {
+  const methods = (resource: Resource, httpMethod: 'GET' | 'POST') => {
     resource.addMethod(httpMethod, integration, {
       authorizer,
       authorizationType: AuthorizationType.COGNITO,
-      authorizationScopes: ['workops/chat'],
+      authorizationScopes: [chatScope],
     });
     resource.addCorsPreflight({
       allowOrigins: Cors.ALL_ORIGINS,

@@ -21,7 +21,7 @@ import { type ReactNode, useState } from 'react';
 import { unstable_rethrow, useRouter } from 'next/navigation';
 import { Controller, useForm } from 'react-hook-form';
 import { createAssetTypeAction, deleteAssetTypeAction, updateAssetTypeAction } from '@/server/asset-types/actions';
-import type { AssetTypeRow } from '@/server/asset-types/data';
+import type { AssetTypeRow } from '@workops/domain/asset-types';
 import { assetTypeSchema } from '@workops/schema/asset-types';
 import { serializeAssetTypeSearchParams } from '../search-params';
 
@@ -51,10 +51,14 @@ function AssetTypeForm({
           if (assetType !== null) {
             await updateAssetTypeAction(assetType.id, values);
             onSaved('saved');
-          } else if (await createAssetTypeAction(values)) {
+            return;
+          }
+          // 登録できなかった理由（コードの重複）は、コードの欄に出す
+          const message = await createAssetTypeAction(values);
+          if (message === undefined) {
             onSaved('created');
           } else {
-            form.setError('code', { message: 'このコードはすでに使われています。別のコードを入力してください。' });
+            form.setError('code', { message });
           }
         } catch (error) {
           // 画面の移動などは Next に任せ、予期しない失敗はボタンの近くに出す

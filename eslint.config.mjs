@@ -1,10 +1,13 @@
 import js from "@eslint/js";
-import { defineConfig } from "eslint/config";
+import { defineConfig, globalIgnores } from "eslint/config";
 import tseslint from "typescript-eslint";
 
 const prohibitedMessage = "Prohibited by user instruction";
 
 export default defineConfig([
+  // 生成物と、shadcn/ui の CLI で追加した部品は対象にしません。
+  globalIgnores(["**/.next/", "**/.amplify/", "**/dist/", "**/dev-dist/", "tmp/", "packages/ui/src/components/", "packages/ui/src/hooks/", "**/next-env.d.ts"]),
+
   js.configs.recommended,
 
   {

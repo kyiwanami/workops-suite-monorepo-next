@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./outputs": "./amplify_outputs.json"
+    "./outputs": "./amplify_outputs.json",
+    "./app-backend": "./amplify/app-backend.ts"
   },
   "scripts": {
     "sandbox": "ampx sandbox",

@@ -1,7 +1,8 @@
+import { Button } from '@workops/ui/components/button';
 import { Badge } from '@workops/ui/components/badge';
 import { Empty, EmptyHeader, EmptyTitle } from '@workops/ui/components/empty';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@workops/ui/components/table';
-import type { RequestTypeRow } from '@/server/request-types/data';
+import type { RequestTypeRow } from '@workops/domain/request-types';
 import { RequestTypeDialog } from './RequestTypeDialog';
 
 // 申請種別の一覧表です。種別名を押すと編集のダイアログが開きます。有効区分は表示だけです。
@@ -34,9 +35,9 @@ export function RequestTypeTable({ requestTypes }: { requestTypes: RequestTypeRo
               <TableCell className="font-mono">{item.code}</TableCell>
               <TableCell>
                 <RequestTypeDialog requestType={item}>
-                  <button type="button" className="font-bold text-primary hover:underline">
+                  <Button variant="link" className="h-auto p-0 font-bold">
                     {item.name}
-                  </button>
+                  </Button>
                 </RequestTypeDialog>
               </TableCell>
               <TableCell>

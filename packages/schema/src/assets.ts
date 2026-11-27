@@ -18,12 +18,10 @@ export const assetSchema = z.object({
     .nullable()
     .meta({ title: '担当者', description: '担当者の利用者識別子。未割当なら null' }),
   departmentId: z
-    .string()
-    .min(1, '部署を選んでください。')
+    .uuid('部署を選んでください。')
     .meta({ title: '部署', description: '部署のID。全体管理者以外は自部署に登録される' }),
   assetTypeId: z
-    .string()
-    .min(1, '種別を選んでください。')
+    .uuid('種別を選んでください。')
     .meta({ title: '種別', description: '資産種別のID' }),
 });
 
@@ -35,11 +33,11 @@ export const assetConditionsSchema = z.object({
     .meta({ description: '資産の名称、または担当者の名前・メールの部分一致' }),
   status: assetStatus.nullable(),
   type: z
-    .string()
+    .uuid()
     .nullable()
     .meta({ description: '資産種別のID' }),
   department: z
-    .string()
+    .uuid()
     .nullable()
     .meta({ description: '部署のID。全体管理者だけに効く' }),
   page: z
@@ -52,6 +50,24 @@ export const assetConditionsSchema = z.object({
 // 資産の一覧の検索条件の型です。
 export type AssetConditions = z.infer<typeof assetConditionsSchema>;
 
+// 資産の一覧の1件です。
+export const assetItemSchema = z.object({
+  id: z.string().meta({ description: '資産のID' }),
+  name: z.string().meta({ description: '資産の名称' }),
+  status: assetStatus,
+  assigneeSub: z
+    .string()
+    .nullable()
+    .meta({ description: '担当者の利用者識別子。未割当なら null' }),
+  assigneeName: z
+    .string()
+    .nullable()
+    .meta({ description: '担当者の名前。未割当なら null' }),
+  assetTypeName: z.string().meta({ description: '資産種別の名前' }),
+  departmentName: z.string().meta({ description: '部署の名前' }),
+  updatedAt: z.string().meta({ description: '更新日時' }),
+});
+
 // 資産の一覧です。条件に合う件数と、このページの資産を返します。
 export const assetListSchema = z.object({
   total: z
@@ -62,24 +78,7 @@ export const assetListSchema = z.object({
     .number()
     .int()
     .meta({ description: 'このページの先頭の位置（0から）' }),
-  assets: z.array(
-    z.object({
-      id: z.string().meta({ description: '資産のID' }),
-      name: z.string().meta({ description: '資産の名称' }),
-      status: assetStatus,
-      assigneeSub: z
-        .string()
-        .nullable()
-        .meta({ description: '担当者の利用者識別子。未割当なら null' }),
-      assigneeName: z
-        .string()
-        .nullable()
-        .meta({ description: '担当者の名前。未割当なら null' }),
-      assetTypeName: z.string().meta({ description: '資産種別の名前' }),
-      departmentName: z.string().meta({ description: '部署の名前' }),
-      updatedAt: z.string().meta({ description: '更新日時' }),
-    }),
-  ),
+  assets: z.array(assetItemSchema),
 });
 
 // 資産の詳細です。
@@ -118,29 +117,31 @@ export const assetUpdateSchema = assetSchema.extend(assetIdSchema.shape);
 // 資産の登録・編集で選べる資産種別の一覧です。
 export const assetTypeOptionsSchema = z.object({ assetTypes: z.array(assetTypeOptionSchema) });
 
+// 部署の選択肢の1件です。
+export const departmentOptionSchema = z.object({
+  id: z.string().meta({ description: '部署のID' }),
+  name: z.string().meta({ description: '部署名' }),
+});
+
 // 資産の登録で選べる部署の一覧です。全体管理者はすべての部署、それ以外は自部署だけです。
-export const departmentOptionsSchema = z.object({
-  departments: z.array(
-    z.object({
-      id: z.string().meta({ description: '部署のID' }),
-      name: z.string().meta({ description: '部署名' }),
-    }),
-  ),
+export const departmentOptionsSchema = z.object({ departments: z.array(departmentOptionSchema) });
+
+// 担当者の候補の1人です。
+export const memberSchema = z.object({
+  sub: z.string().meta({ description: '利用者識別子。資産の担当者に指定する値' }),
+  name: z.string().meta({ description: '利用者の名前' }),
+  email: z.string().meta({ description: '利用者のメール' }),
+  departmentId: z.string().meta({ description: '所属する部署のID' }),
 });
 
 // 資産の担当者に選べる、部署の有効な利用者の一覧です。全体管理者はすべての部署、それ以外は自部署の利用者です。
-export const membersSchema = z.object({
-  members: z.array(
-    z.object({
-      sub: z.string().meta({ description: '利用者識別子。資産の担当者に指定する値' }),
-      name: z.string().meta({ description: '利用者の名前' }),
-      email: z.string().meta({ description: '利用者のメール' }),
-      departmentId: z.string().meta({ description: '所属する部署のID' }),
-    }),
-  ),
-});
+export const membersSchema = z.object({ members: z.array(memberSchema) });
 
-// 資産の一覧・詳細・資産種別の選択肢の型です。
+// 資産の一覧・詳細・選択肢・状態・担当者の候補の型です。
 export type AssetList = z.infer<typeof assetListSchema>;
 export type AssetDetail = z.infer<typeof assetDetailSchema>;
 export type AssetTypeOption = z.infer<typeof assetTypeOptionSchema>;
+export type AssetItem = z.infer<typeof assetItemSchema>;
+export type AssetStatus = z.infer<typeof assetStatus>;
+export type DepartmentOption = z.infer<typeof departmentOptionSchema>;
+export type Member = z.infer<typeof memberSchema>;

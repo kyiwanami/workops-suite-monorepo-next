@@ -6,9 +6,11 @@ import { Button } from '@workops/ui/components/button';
 import { Spinner } from '@workops/ui/components/spinner';
 import { unstable_rethrow } from 'next/navigation';
 import { useQueryStates } from 'nuqs';
-import { type ReactNode, useState, useTransition } from 'react';
+import { useActionState } from 'react';
 import { deleteUserAction, disableUserAction, enableUserAction, resendInvitationAction } from '@/server/users/actions';
-import type { UserDetail } from '@/server/users/data';
+import { Badge } from '@workops/ui/components/badge';
+import { statusBadges } from '../labels';
+import type { AccountStatus } from '../schema';
 import { userDetailSearchParams } from '../search-params';
 
 // ユーザーの詳細の題と、状態に合わせたアカウントの操作です。
@@ -18,49 +20,41 @@ export function AccountActions({
   email,
   displayName,
   status,
-  badge,
 }: {
   sub: string;
   email: string;
   displayName: string;
-  status: UserDetail['status'];
-  badge: ReactNode;
+  status: AccountStatus;
 }) {
-  // 招待メールの再送の結果です。
-  const [resent, setResent] = useState<'sent' | 'failed' | null>(null);
-  const [resending, startResend] = useTransition();
   const [, setParams] = useQueryStates(userDetailSearchParams, { shallow: false });
+  // 招待メールを再送し、結果を返します。
+  const [resent, resend, resending] = useActionState<'sent' | 'failed' | null>(async () => {
+    // 前の操作の結果の表示は消す
+    void setParams({ done: null });
+    try {
+      await resendInvitationAction(email);
+      return 'sent';
+    } catch (error) {
+      unstable_rethrow(error);
+      console.error(error);
+      return 'failed';
+    }
+  }, null);
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold">{displayName}</h1>
-          {badge}
+          <Badge variant={statusBadges[status].variant}>{statusBadges[status].label}</Badge>
         </div>
         <div className="flex flex-wrap gap-2">
           {status === 'invited' && (
-            <Button
-              variant="outline"
-              disabled={resending}
-              onClick={() =>
-                startResend(async () => {
-                  // 前の操作の結果の表示は消す
-                  void setParams({ done: null });
-                  setResent(null);
-                  try {
-                    await resendInvitationAction(email);
-                    setResent('sent');
-                  } catch (error) {
-                    unstable_rethrow(error);
-                    console.error(error);
-                    setResent('failed');
-                  }
-                })
-              }
-            >
-              {resending && <Spinner />}
-              {resending ? '再送しています' : '招待メールを再送する'}
-            </Button>
+            <form action={resend}>
+              <Button type="submit" variant="outline" disabled={resending}>
+                {resending && <Spinner />}
+                {resending ? '再送しています' : '招待メールを再送する'}
+              </Button>
+            </form>
           )}
           {status === 'disabled' ? (
             <>
