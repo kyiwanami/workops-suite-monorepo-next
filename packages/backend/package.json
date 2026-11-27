@@ -31,5 +31,8 @@
     "esbuild": "0.28.2",
     "hono": "4.13.22",
     "zod": "4.6.7"
+  },
+  "dependencies": {
+    "cdk-monitoring-constructs": "11.0.0"
   }
 }

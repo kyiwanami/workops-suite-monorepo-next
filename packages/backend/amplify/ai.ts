@@ -38,6 +38,7 @@ import { Secret } from 'aws-cdk-lib/aws-secretsmanager';
 import domainPackage from '../../domain/package.json';
 import { buildSync } from 'esbuild';
 import { mcpClientProviders } from './mcp-clients';
+import { createAlarms } from './alarms';
 import { createChatBackend } from './chat';
 import { createPolicies } from './policies';
 
@@ -261,6 +262,18 @@ export function createAiBackend(props: {
   // チャットの経路です。チャットのAPIの処理は、登録されたアプリのURLを共有の Aurora から読みます。
   const chat = createChatBackend({ stack, userPool, gateway, tokenExchangeClient, tokenExchangeSecret, chatFunction: props.chatFunction });
   cluster.grantDataApiAccess(props.chatFunction);
+
+  // AI機能のアラームです。
+  createAlarms({
+    stack,
+    gateway,
+    runtime,
+    policyEngine,
+    api: chat.api,
+    chatFunction: props.chatFunction,
+    guardrail: chat.guardrail,
+    guardrailVersion: chat.guardrailVersion,
+  });
 
   // 利用者ごとに、ツールの呼び出しを毎分60回までにします。
   new CfnGatewayRateLimit(stack, 'RateLimit', {
