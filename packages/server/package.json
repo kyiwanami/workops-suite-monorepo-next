@@ -5,11 +5,12 @@
   "type": "module",
   "exports": {
     "./user": "./user.ts",
+    "./found": "./found.ts",
     "./db": "./db.ts",
     "./app": "./app.ts",
     "./cognito": "./cognito.ts",
     "./chat": "./chat.ts",
-    "./security-headers": "./security-headers.ts"
+    "./proxy": "./proxy.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
@@ -21,6 +22,7 @@
     "@workops/backend": "*",
     "@workops/blocks": "*",
     "@workops/domain": "*",
+    "@workops/schema": "*",
     "aws-amplify": "6.22.2",
     "drizzle-orm": "1.0.0-rc.5",
     "nosecone": "1.16.0",

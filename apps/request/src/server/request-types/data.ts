@@ -4,8 +4,8 @@ import * as requestTypes from '@workops/domain/request-types';
 import type { requestTypeSchema } from '@workops/schema/request-types';
 import { notFound } from 'next/navigation';
 import type { z } from 'zod';
-import { found, getContext } from '@/server/context';
-import { getMember } from '@/server/user';
+import { found } from '@workops/server/found';
+import { getContext, getMember } from '@/server/user';
 
 // 申請種別の管理は承認者以上だけに許可します。権限がなければ、見つからない画面を表示します。
 export async function getManager() {
