@@ -1,5 +1,5 @@
 import { request, requestType } from '@workops/blocks/schema';
-import { asc, count, eq } from 'drizzle-orm';
+import { and, asc, count, eq, notExists } from 'drizzle-orm';
 import type { z } from 'zod';
 import type { Context } from './context';
 import { hasRole } from './membership';
@@ -62,12 +62,15 @@ export async function updateRequestType(context: Context, id: string, values: z.
   return true;
 }
 
-// 申請種別を削除し、true を返します。申請が使っている種別は、DB の参照制約で削除できません。
-// 承認者以上でなければ null を返します。
+// 申請が使っていない申請種別を削除し、削除できたかを返します。承認者以上でなければ null を返します。
 export async function deleteRequestType(context: Context, id: string) {
   if (!hasRole(context.member, 'manager')) {
     return null;
   }
-  await context.db.delete(requestType).where(eq(requestType.id, id));
-  return true;
+  const { db } = context;
+  const deleted = await db
+    .delete(requestType)
+    .where(and(eq(requestType.id, id), notExists(db.select().from(request).where(eq(request.requestTypeId, id)))))
+    .returning({ id: requestType.id });
+  return deleted.length > 0;
 }

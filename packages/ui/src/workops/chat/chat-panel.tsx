@@ -62,7 +62,19 @@ export function ChatProvider({ chatApiUrl, children }: { chatApiUrl: string; chi
   // 新しい会話のIDは画面で作ります。
   const [chat, setChat] = useState(() => createChat(crypto.randomUUID(), []));
   return (
-    <PanelContext.Provider value={{ chatApiUrl, open, setOpen, chat, openChat: (id, messages) => setChat(createChat(id, messages)) }}>
+    <PanelContext.Provider
+      value={{
+        chatApiUrl,
+        open,
+        setOpen,
+        chat,
+        // 替える前に今の会話の受け取りを止める（外から渡した会話は useChat が止めない）
+        openChat: (id, messages) => {
+          void chat.stop();
+          setChat(createChat(id, messages));
+        },
+      }}
+    >
       {children}
     </PanelContext.Provider>
   );

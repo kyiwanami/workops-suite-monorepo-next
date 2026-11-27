@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import type { z } from 'zod';
 import { createUser, deleteUser, disableUser, enableUser, resendInvitation, saveMembership } from './data';
 import { membershipSchema, userSchema } from '@/features/users/schema';
+import { serializeUserDetailSearchParams, serializeUserSearchParams } from '@/features/users/search-params';
 
 // 入力を検証してユーザーを作成し、招待メールを送って所属を登録します。結果の通知のため、名前とメールも返します。
 // メールのユーザーがすでにいるときは exists、所属の登録だけ失敗したときは membershipFailed を返します。
@@ -45,23 +46,25 @@ export async function resendInvitationAction(email: string) {
   await resendInvitation(email);
 }
 
-// ユーザーを有効にします。
+// ユーザーを有効にし、有効にした旨を出す詳細へ戻ります。
 export async function enableUserAction(formData: FormData) {
   const sub = String(formData.get('sub'));
   await enableUser(sub);
   revalidatePath(`/admin/users/${sub}`);
+  redirect(serializeUserDetailSearchParams(`/admin/users/${sub}`, { done: 'enabled' }));
 }
 
-// ユーザーを無効にします。
+// ユーザーを無効にし、無効にした旨を出す詳細へ戻ります。
 export async function disableUserAction(formData: FormData) {
   const sub = String(formData.get('sub'));
   await disableUser(sub);
   revalidatePath(`/admin/users/${sub}`);
+  redirect(serializeUserDetailSearchParams(`/admin/users/${sub}`, { done: 'disabled' }));
 }
 
-// ユーザーを削除し、一覧へ戻ります。
+// ユーザーを削除し、削除した旨を出す一覧へ戻ります。
 export async function deleteUserAction(formData: FormData) {
   await deleteUser(String(formData.get('sub')));
   revalidatePath('/admin/users');
-  redirect('/admin/users');
+  redirect(serializeUserSearchParams('/admin/users', { done: 'deleted' }));
 }

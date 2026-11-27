@@ -2,23 +2,27 @@
 
 import { Button } from '@workops/ui/components/button';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@workops/ui/components/command';
-import { Field, FieldDescription, FieldLabel } from '@workops/ui/components/field';
+import { Field, FieldDescription, FieldError, FieldLabel } from '@workops/ui/components/field';
 import { Popover, PopoverContent, PopoverTrigger } from '@workops/ui/components/popover';
 import { cn } from '@workops/ui/lib/utils';
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { useState } from 'react';
+import type { ControllerFieldState } from 'react-hook-form';
 import type { Member } from '@/server/assets/data';
 
 // 担当者の選択です。部署の有効な利用者を名前・メールで検索して選びます。先頭の「未割当」で担当者を外せます。
 // 名前が未設定の利用者は名前の欄にメールが入るため、メールの行を重ねて出しません。
+// 保存のときにサーバーで見つかった誤りは、この項目の下に出します。
 export function AssigneeField({
   members,
   value,
   onChange,
+  fieldState,
 }: {
   members: Member[];
   value: string | null;
   onChange: (value: string | null) => void;
+  fieldState: ControllerFieldState;
 }) {
   const [open, setOpen] = useState(false);
   const selected = members.find((member) => member.sub === value);
@@ -28,7 +32,7 @@ export function AssigneeField({
     setOpen(false);
   };
   return (
-    <Field>
+    <Field data-invalid={fieldState.invalid}>
       <FieldLabel htmlFor="assigneeSub">担当者</FieldLabel>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
@@ -64,6 +68,7 @@ export function AssigneeField({
         </PopoverContent>
       </Popover>
       <FieldDescription>部署の有効な利用者から検索して選びます。</FieldDescription>
+      <FieldError errors={[fieldState.error]} />
     </Field>
   );
 }

@@ -3,21 +3,20 @@ import {
   createLoader,
   createSerializer,
   type inferParserType,
-  parseAsBoolean,
   parseAsInteger,
   parseAsString,
   parseAsStringLiteral,
 } from 'nuqs/server';
 
 // 資産の一覧の検索条件です。URL に持ち、画面とサーバーの両方で同じ形で読み書きします。
-// saved は、資産を保存して一覧へ戻ったことを表します。
+// done は、資産を保存・削除して一覧へ戻ったことを表します。
 export const assetSearchParams = {
   q: parseAsString,
   status: parseAsStringLiteral(asset.status.enumValues),
   type: parseAsString,
   department: parseAsString,
   page: parseAsInteger.withDefault(1),
-  saved: parseAsBoolean,
+  done: parseAsStringLiteral(['saved', 'deleted']),
 };
 
 // サーバーで URL から検索条件を読みます。

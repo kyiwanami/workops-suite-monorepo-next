@@ -20,7 +20,7 @@ export function AssetPagination({
   params: AssetSearchParams;
 }) {
   // 指定したページへ移る URL です。保存した旨の表示は引き継ぎません。
-  const href = (page: number) => serializeAssetSearchParams('/assets', { ...params, page, saved: null });
+  const href = (page: number) => serializeAssetSearchParams('/assets', { ...params, page, done: null });
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
       <span className="font-mono tabular-nums">

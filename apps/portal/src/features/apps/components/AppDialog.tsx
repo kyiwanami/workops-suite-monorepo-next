@@ -15,16 +15,19 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@wo
 import { Input } from '@workops/ui/components/input';
 import { Textarea } from '@workops/ui/components/textarea';
 import { ConfirmButton } from '@workops/ui/workops/confirm-button';
+import { FormFailure } from '@workops/ui/workops/form-failure';
 import { SubmitButton } from '@workops/ui/workops/submit-button';
 import { type ReactNode, useState } from 'react';
+import { unstable_rethrow, useRouter } from 'next/navigation';
 import { Controller, useForm } from 'react-hook-form';
 import { createAppAction, deleteAppAction, updateAppAction } from '@/server/apps/actions';
 import type { AppRow } from '@/server/apps/data';
 import { appSchema } from '../schema';
+import { serializeAppSearchParams } from '../search-params';
 
 // アプリの登録・編集のフォームです。ダイアログを開くたびに作り直し、アプリの今の値から始めます。編集ではアプリ ID を変えられません。
 // 登録でアプリ ID がすでに使われていたら、アプリ ID の項目にその旨を出します。
-function AppForm({ app, onSaved }: { app: AppRow | null; onSaved: () => void }) {
+function AppForm({ app, onSaved }: { app: AppRow | null; onSaved: (done: 'appCreated' | 'appSaved') => void }) {
   const form = useForm({
     resolver: zodResolver(appSchema),
     defaultValues: {
@@ -38,13 +41,20 @@ function AppForm({ app, onSaved }: { app: AppRow | null; onSaved: () => void }) 
   return (
     <form
       onSubmit={form.handleSubmit(async (values) => {
-        if (app !== null) {
-          await updateAppAction(values);
-          onSaved();
-        } else if (await createAppAction(values)) {
-          onSaved();
-        } else {
-          form.setError('appId', { message: 'このアプリ ID はすでに使われています。' });
+        try {
+          if (app !== null) {
+            await updateAppAction(values);
+            onSaved('appSaved');
+          } else if (await createAppAction(values)) {
+            onSaved('appCreated');
+          } else {
+            form.setError('appId', { message: 'このアプリ ID はすでに使われています。' });
+          }
+        } catch (error) {
+          // 画面の移動などは Next に任せ、予期しない失敗はボタンの近くに出す
+          unstable_rethrow(error);
+          console.error(error);
+          form.setError('root', { message: '保存できませんでした。時間をおいて、もう一度お試しください。' });
         }
       })}
       className="grid gap-6"
@@ -112,6 +122,7 @@ function AppForm({ app, onSaved }: { app: AppRow | null; onSaved: () => void }) 
           )}
         />
       </FieldGroup>
+      <FormFailure error={form.formState.errors.root} />
       <DialogFooter className="sm:justify-between">
         {app !== null && (
           <ConfirmButton
@@ -144,6 +155,7 @@ function AppForm({ app, onSaved }: { app: AppRow | null; onSaved: () => void }) 
 // アプリの登録・編集のダイアログです。アプリを渡すと編集、渡さないと登録になります。保存したら閉じます。
 export function AppDialog({ app, children }: { app: AppRow | null; children: ReactNode }) {
   const [open, setOpen] = useState(false);
+  const router = useRouter();
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
@@ -151,7 +163,11 @@ export function AppDialog({ app, children }: { app: AppRow | null; children: Rea
         <DialogHeader>
           <DialogTitle>{app === null ? 'アプリを登録する' : 'アプリを編集する'}</DialogTitle>
         </DialogHeader>
-        <AppForm app={app} onSaved={() => setOpen(false)} />
+        <AppForm app={app} onSaved={(done) => {
+            // 登録・保存した旨を一覧の題の下に出す
+            router.replace(serializeAppSearchParams('/admin/apps', { done }), { scroll: false });
+            setOpen(false);
+          }} />
       </DialogContent>
     </Dialog>
   );

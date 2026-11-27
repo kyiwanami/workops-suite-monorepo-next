@@ -7,7 +7,7 @@ import { ComparisonOperator, TreatMissingData } from 'aws-cdk-lib/aws-cloudwatch
 import type { IFunction } from 'aws-cdk-lib/aws-lambda';
 import { Topic } from 'aws-cdk-lib/aws-sns';
 import { EmailSubscription } from 'aws-cdk-lib/aws-sns-subscriptions';
-import { MetricStatistic, MonitoringFacade, SnsAlarmActionStrategy } from 'cdk-monitoring-constructs';
+import { DefaultDashboardFactory, MetricStatistic, MonitoringFacade, SnsAlarmActionStrategy } from 'cdk-monitoring-constructs';
 
 // アラームの通知先のメールアドレスです。デプロイのときの環境変数で指定します。
 const alarmEmail = process.env.ALARM_EMAIL;
@@ -34,10 +34,13 @@ export function createAlarms(props: {
 
   const topic = new Topic(stack, 'AlarmTopic');
   topic.addSubscription(new EmailSubscription(alarmEmail));
+  // アラームとダッシュボードの名前はアカウントとリージョンで一意のため、スタックごとに一意の接頭辞を付けます。
+  const prefix = Names.uniqueResourceName(stack, { maxLength: 40 });
   const monitoring = new MonitoringFacade(stack, 'Monitoring', {
-    // アラームの名前はアカウントとリージョンで一意のため、スタックごとに一意の接頭辞を付けます。
+    // アラームだけを作り、ダッシュボードは作りません。
+    dashboardFactory: new DefaultDashboardFactory(stack, 'Dashboards', { dashboardNamePrefix: prefix, createDashboard: false }),
     alarmFactoryDefaults: {
-      alarmNamePrefix: Names.uniqueResourceName(stack, { maxLength: 40 }),
+      alarmNamePrefix: prefix,
       actionsEnabled: true,
       action: new SnsAlarmActionStrategy({ onAlarmTopic: topic }),
       // 条件は5分ごとの値で見るため、1回超えたら鳴らします（ライブラリの既定は3回続けて超えたとき）。

@@ -1,14 +1,17 @@
 'use client';
 
-import { Alert, AlertTitle } from '@workops/ui/components/alert';
+import { Alert, AlertDescription, AlertTitle } from '@workops/ui/components/alert';
 import { Card, CardContent } from '@workops/ui/components/card';
 import { Empty, EmptyHeader, EmptyTitle } from '@workops/ui/components/empty';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@workops/ui/components/table';
 import Link from 'next/link';
+import { useQueryStates } from 'nuqs';
+import { unstable_rethrow } from 'next/navigation';
 import { type ReactNode, useState, useTransition } from 'react';
 import { changeStatusAction } from '@/server/assets/actions';
 import type { AssetRow } from '@/server/assets/data';
 import { formatDateTime, assetStatusBadges } from '@workops/ui/lib/labels';
+import { assetSearchParams } from '../search-params';
 import { StatusMenu } from './StatusMenu';
 
 // 資産の一覧です。広い画面は表、狭い画面は Card を並べます。名称を押すと詳細を開きます。
@@ -25,11 +28,23 @@ export function AssetList({
   filters: ReactNode;
 }) {
   const [changed, setChanged] = useState<Awaited<ReturnType<typeof changeStatusAction>> | null>(null);
+  const [failed, setFailed] = useState(false);
   const [pending, startTransition] = useTransition();
-  // 状態を保存し、変えた内容を出します。
+  const [, setParams] = useQueryStates(assetSearchParams, { shallow: false });
+  // 状態を保存し、変えた内容を出します。変えられなければ、その旨を同じ場所に出します。
   const change = (id: string, status: AssetRow['status']) =>
     startTransition(async () => {
-      setChanged(await changeStatusAction(id, status));
+      // 前の操作の結果の表示は消す
+      void setParams({ done: null });
+      setChanged(null);
+      setFailed(false);
+      try {
+        setChanged(await changeStatusAction(id, status));
+      } catch (error) {
+        unstable_rethrow(error);
+        console.error(error);
+        setFailed(true);
+      }
     });
   // 状態のバッジです。
   const statusMenu = (item: AssetRow) => (
@@ -47,6 +62,12 @@ export function AssetList({
           <AlertTitle>
             状態を{assetStatusBadges[changed.from].label}から{assetStatusBadges[changed.to].label}に変更しました
           </AlertTitle>
+        </Alert>
+      )}
+      {failed && (
+        <Alert variant="destructive">
+          <AlertTitle>状態を変更できませんでした</AlertTitle>
+          <AlertDescription>時間をおいて、もう一度お試しください。</AlertDescription>
         </Alert>
       )}
       {filters}

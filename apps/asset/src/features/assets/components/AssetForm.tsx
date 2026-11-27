@@ -14,8 +14,10 @@ import {
 import { Input } from '@workops/ui/components/input';
 import { RadioGroup, RadioGroupItem } from '@workops/ui/components/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@workops/ui/components/select';
+import { FormFailure } from '@workops/ui/workops/form-failure';
 import { SubmitButton } from '@workops/ui/workops/submit-button';
 import Link from 'next/link';
+import { unstable_rethrow } from 'next/navigation';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { createAssetAction, updateAssetAction } from '@/server/assets/actions';
 import type { AssetDetail, Member, Option } from '@/server/assets/data';
@@ -53,7 +55,16 @@ export function AssetForm({
   return (
     <form
       onSubmit={form.handleSubmit(async (values) => {
-        await (asset === null ? createAssetAction(values) : updateAssetAction(asset.id, values));
+        try {
+          // 保存できたら一覧へ移るため、戻るのは担当者の誤りで保存できなかったときだけ
+          const message = await (asset === null ? createAssetAction(values) : updateAssetAction(asset.id, values));
+          form.setError('assigneeSub', { message });
+        } catch (error) {
+          // 画面の移動などは Next に任せ、予期しない失敗はボタンの近くに出す
+          unstable_rethrow(error);
+          console.error(error);
+          form.setError('root', { message: '保存できませんでした。時間をおいて、もう一度お試しください。' });
+        }
       })}
     >
       <Card>
@@ -143,16 +154,18 @@ export function AssetForm({
             <Controller
               name="assigneeSub"
               control={form.control}
-              render={({ field }) => (
+              render={({ field, fieldState }) => (
                 <AssigneeField
                   members={members.filter((member) => member.departmentId === selectedDepartmentId)}
                   value={field.value}
                   onChange={field.onChange}
+                  fieldState={fieldState}
                 />
               )}
             />
           </FieldGroup>
         </CardContent>
+        <FormFailure error={form.formState.errors.root} />
         <CardFooter className="flex-wrap justify-between gap-3">
           <span className="font-mono text-xs text-muted-foreground tabular-nums">
             {asset !== null && `更新：${formatDateTime(asset.updatedAt)}`}

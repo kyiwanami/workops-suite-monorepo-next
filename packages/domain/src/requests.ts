@@ -21,8 +21,8 @@ export const pageSize = 20;
 // 申請の状態です。
 type Status = typeof request.$inferSelect['status'];
 
-// 申請の操作が失敗したときのエラーです。画面では、保存済みの申請を確認するよう案内します。
-const operationError = () => new BusinessError('申請を操作できませんでした。');
+// 申請の今の状態やロールでは操作できないときのエラーです。
+const operationError = () => new BusinessError('申請の今の状態では、この操作はできません。');
 
 // 利用者が扱える申請の条件です。全体管理者はすべての部署、それ以外は自部署の申請だけを扱えます。
 const departmentScope = (member: Membership) => (member.isAdmin ? undefined : eq(request.departmentId, member.departmentId));

@@ -7,9 +7,10 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@wo
 import { Input } from '@workops/ui/components/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@workops/ui/components/select';
 import { Textarea } from '@workops/ui/components/textarea';
+import { FormFailure } from '@workops/ui/workops/form-failure';
 import { SubmitButton } from '@workops/ui/workops/submit-button';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { unstable_rethrow, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import type { z } from 'zod';
@@ -33,7 +34,8 @@ export function RequestForm({
   resubmit: boolean;
 }) {
   const router = useRouter();
-  const [failure, setFailure] = useState<{ submitted: boolean; requestId: string | null } | null>(null);
+  // 提出できなかった、保存済みの下書きの ID です。
+  const [unsubmitted, setUnsubmitted] = useState<string | null>(null);
   const form = useForm({
     resolver: zodResolver(requestSchema),
     defaultValues: {
@@ -46,24 +48,33 @@ export function RequestForm({
   // 申請を保存し、提出するときは続けて提出します。
   const save = (submit: boolean) =>
     form.handleSubmit(async (values: z.infer<typeof requestSchema>) => {
-      setFailure(null);
-      let requestId: string;
-      try {
-        requestId = await (request === null ? createRequestAction(values) : updateRequestAction(request.id, values));
-      } catch (error) {
+      setUnsubmitted(null);
+      const saved = await (request === null ? createRequestAction(values) : updateRequestAction(request.id, values)).catch((error: Error) => {
+        unstable_rethrow(error);
         console.error(error);
-        setFailure({ submitted: false, requestId: request === null ? null : request.id });
+        return null;
+      });
+      // 予期しない失敗で保存できなかった
+      if (saved === null) {
+        form.setError('root', { message: '保存できませんでした。時間をおいて、もう一度お試しください。' });
+        return;
+      }
+      // 業務のルールで保存できなかった
+      if ('message' in saved) {
+        form.setError('root', { message: saved.message });
         return;
       }
       if (!submit) {
-        router.push(serializeRequestSearchParams('/requests', { saved: true }));
+        router.push(serializeRequestSearchParams('/requests', { done: 'saved' }));
         return;
       }
       try {
-        await submitRequestAction(requestId);
+        await submitRequestAction(saved.id);
       } catch (error) {
+        // 提出できたときの一覧への移動は、Next に任せる
+        unstable_rethrow(error);
         console.error(error);
-        setFailure({ submitted: true, requestId });
+        setUnsubmitted(saved.id);
       }
     });
   const pending = form.formState.isSubmitting;
@@ -137,16 +148,10 @@ export function RequestForm({
           </FieldGroup>
         </CardContent>
       </Card>
-      {failure !== null &&
-        (failure.submitted ? (
-          <OperationError title="提出できませんでした" description="入力内容は下書きとして保存されています。" requestId={failure.requestId} />
-        ) : (
-          <OperationError
-            title="保存できませんでした"
-            description="保存済みの申請を確認してください。"
-            requestId={failure.requestId}
-          />
-        ))}
+      <FormFailure error={form.formState.errors.root} />
+      {unsubmitted !== null && (
+        <OperationError title="提出できませんでした" description="入力内容は下書きとして保存されています。時間をおいて、もう一度提出してください。" requestId={unsubmitted} />
+      )}
       <ActionBar>
         {request === null && (
           <Button variant="outline" asChild className="max-md:hidden">

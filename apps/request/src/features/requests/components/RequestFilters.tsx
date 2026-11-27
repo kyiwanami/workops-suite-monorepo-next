@@ -40,7 +40,7 @@ export function RequestFilters({
         value={params.tab}
         onValueChange={(value) => {
           const tab = requestTabs.find((item) => item === value);
-          void setParams({ tab: tab ?? null, page: null, saved: null });
+          void setParams({ tab: tab ?? null, page: null, done: null });
         }}
       >
         <TabsList>
@@ -72,14 +72,14 @@ export function RequestFilters({
           className="min-w-60 flex-1"
           onSubmit={(event) => {
             event.preventDefault();
-            void setParams({ q: String(new FormData(event.currentTarget).get('q')) || null, page: null, saved: null });
+            void setParams({ q: String(new FormData(event.currentTarget).get('q')) || null, page: null, done: null });
           }}
         >
           <Input name="q" type="search" placeholder="件名・申請者で検索" defaultValue={params.q ?? ''} />
         </form>
         <Select
           value={params.type ?? all}
-          onValueChange={(value) => void setParams({ type: value === all ? null : value, page: null, saved: null })}
+          onValueChange={(value) => void setParams({ type: value === all ? null : value, page: null, done: null })}
         >
           <SelectTrigger className="w-44">
             <SelectValue />
@@ -97,7 +97,7 @@ export function RequestFilters({
           value={params.period}
           onValueChange={(value) => {
             const period = requestPeriods.find((item) => item === value);
-            void setParams({ period: period ?? null, page: null, saved: null });
+            void setParams({ period: period ?? null, page: null, done: null });
           }}
         >
           <SelectTrigger className="w-36">
@@ -114,7 +114,7 @@ export function RequestFilters({
         {departments !== null && (
           <Select
             value={params.department ?? all}
-            onValueChange={(value) => void setParams({ department: value === all ? null : value, page: null, saved: null })}
+            onValueChange={(value) => void setParams({ department: value === all ? null : value, page: null, done: null })}
           >
             <SelectTrigger className="w-48">
               <SelectValue />

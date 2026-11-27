@@ -34,7 +34,7 @@ export async function updateRequestType(id: string, values: z.infer<typeof reque
   found(await requestTypes.updateRequestType(await getContext(), id, values));
 }
 
-// 申請種別を削除します。権限がなければ、見つからない画面を表示します。
+// 申請種別を削除し、削除できたかを返します。権限がなければ、見つからない画面を表示します。
 export async function deleteRequestType(id: string) {
-  found(await requestTypes.deleteRequestType(await getContext(), id));
+  return found(await requestTypes.deleteRequestType(await getContext(), id));
 }

@@ -34,7 +34,7 @@ export async function updateAssetType(id: string, values: z.infer<typeof assetTy
   found(await assetTypes.updateAssetType(await getContext(), id, values));
 }
 
-// 資産種別を削除します。権限がなければ、見つからない画面を表示します。
+// 資産種別を削除し、削除できたかを返します。権限がなければ、見つからない画面を表示します。
 export async function deleteAssetType(id: string) {
-  found(await assetTypes.deleteAssetType(await getContext(), id));
+  return found(await assetTypes.deleteAssetType(await getContext(), id));
 }

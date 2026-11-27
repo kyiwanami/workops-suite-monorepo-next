@@ -22,14 +22,14 @@ export function AssetFilters({ assetTypes, departments }: { assetTypes: Option[]
         className="min-w-60 flex-1"
         onSubmit={(event) => {
           event.preventDefault();
-          void setParams({ q: String(new FormData(event.currentTarget).get('q')) || null, page: null, saved: null });
+          void setParams({ q: String(new FormData(event.currentTarget).get('q')) || null, page: null, done: null });
         }}
       >
         <Input name="q" type="search" placeholder="名称・担当者で検索" defaultValue={params.q ?? ''} />
       </form>
       <Select
         value={params.status ?? all}
-        onValueChange={(value) => void setParams({ status: value === all ? null : assetStatus.parse(value), page: null, saved: null })}
+        onValueChange={(value) => void setParams({ status: value === all ? null : assetStatus.parse(value), page: null, done: null })}
       >
         <SelectTrigger className="w-40">
           <SelectValue />
@@ -45,7 +45,7 @@ export function AssetFilters({ assetTypes, departments }: { assetTypes: Option[]
       </Select>
       <Select
         value={params.type ?? all}
-        onValueChange={(value) => void setParams({ type: value === all ? null : value, page: null, saved: null })}
+        onValueChange={(value) => void setParams({ type: value === all ? null : value, page: null, done: null })}
       >
         <SelectTrigger className="w-44">
           <SelectValue />
@@ -62,7 +62,7 @@ export function AssetFilters({ assetTypes, departments }: { assetTypes: Option[]
       {departments !== null && (
         <Select
           value={params.department ?? all}
-          onValueChange={(value) => void setParams({ department: value === all ? null : value, page: null, saved: null })}
+          onValueChange={(value) => void setParams({ department: value === all ? null : value, page: null, done: null })}
         >
           <SelectTrigger className="w-48">
             <SelectValue />

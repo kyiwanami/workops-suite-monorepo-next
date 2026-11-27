@@ -1,12 +1,15 @@
 'use client';
 
-import { Alert, AlertTitle } from '@workops/ui/components/alert';
+import { Alert, AlertDescription, AlertTitle } from '@workops/ui/components/alert';
 import { ConfirmButton } from '@workops/ui/workops/confirm-button';
 import { Button } from '@workops/ui/components/button';
 import { Spinner } from '@workops/ui/components/spinner';
+import { unstable_rethrow } from 'next/navigation';
+import { useQueryStates } from 'nuqs';
 import { type ReactNode, useState, useTransition } from 'react';
 import { deleteUserAction, disableUserAction, enableUserAction, resendInvitationAction } from '@/server/users/actions';
 import type { UserDetail } from '@/server/users/data';
+import { userDetailSearchParams } from '../search-params';
 
 // ユーザーの詳細の題と、状態に合わせたアカウントの操作です。
 // 招待メールの再送は招待中だけ、削除は無効にした後だけ出します。
@@ -23,8 +26,10 @@ export function AccountActions({
   status: UserDetail['status'];
   badge: ReactNode;
 }) {
-  const [resent, setResent] = useState(false);
+  // 招待メールの再送の結果です。
+  const [resent, setResent] = useState<'sent' | 'failed' | null>(null);
   const [resending, startResend] = useTransition();
+  const [, setParams] = useQueryStates(userDetailSearchParams, { shallow: false });
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -39,8 +44,17 @@ export function AccountActions({
               disabled={resending}
               onClick={() =>
                 startResend(async () => {
-                  await resendInvitationAction(email);
-                  setResent(true);
+                  // 前の操作の結果の表示は消す
+                  void setParams({ done: null });
+                  setResent(null);
+                  try {
+                    await resendInvitationAction(email);
+                    setResent('sent');
+                  } catch (error) {
+                    unstable_rethrow(error);
+                    console.error(error);
+                    setResent('failed');
+                  }
                 })
               }
             >
@@ -82,9 +96,15 @@ export function AccountActions({
           )}
         </div>
       </div>
-      {resent && (
+      {resent === 'sent' && (
         <Alert variant="success">
           <AlertTitle>招待メールを再送しました。</AlertTitle>
+        </Alert>
+      )}
+      {resent === 'failed' && (
+        <Alert variant="destructive">
+          <AlertTitle>招待メールを再送できませんでした</AlertTitle>
+          <AlertDescription>時間をおいて、もう一度お試しください。</AlertDescription>
         </Alert>
       )}
     </>

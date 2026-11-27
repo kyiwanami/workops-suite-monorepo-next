@@ -1,5 +1,5 @@
 import { asset, assetType } from '@workops/blocks/schema';
-import { asc, count, eq } from 'drizzle-orm';
+import { and, asc, count, eq, notExists } from 'drizzle-orm';
 import type { z } from 'zod';
 import type { Context } from './context';
 import { hasRole } from './membership';
@@ -61,11 +61,15 @@ export async function updateAssetType(context: Context, id: string, values: z.in
   return true;
 }
 
-// 資産種別を削除し、true を返します。承認者以上でなければ null を返します。
+// 資産のない資産種別を削除し、削除できたかを返します。承認者以上でなければ null を返します。
 export async function deleteAssetType(context: Context, id: string) {
   if (!hasRole(context.member, 'manager')) {
     return null;
   }
-  await context.db.delete(assetType).where(eq(assetType.id, id));
-  return true;
+  const { db } = context;
+  const deleted = await db
+    .delete(assetType)
+    .where(and(eq(assetType.id, id), notExists(db.select().from(asset).where(eq(asset.assetTypeId, id)))))
+    .returning({ id: assetType.id });
+  return deleted.length > 0;
 }

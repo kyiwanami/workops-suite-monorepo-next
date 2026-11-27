@@ -1,12 +1,12 @@
 import 'server-only';
 import { db } from '@workops/server/db';
-import { department, userMembership } from '@workops/blocks/schema';
-import { asc, count, eq } from 'drizzle-orm';
+import { asset, department, request, userMembership } from '@workops/blocks/schema';
+import { and, asc, count, eq, notExists } from 'drizzle-orm';
 import type { z } from 'zod';
 import { getAdmin } from '@/server/user';
 import type { departmentSchema } from '@/features/departments/schema';
 
-// 部署を表示順・部署コードの順で全件返します。所属人数を一緒に返します。
+// 部署を表示順・部署コードの順で全件返します。所属人数と、資産・申請の件数を一緒に返します。
 export async function listDepartments() {
   await getAdmin();
   return db
@@ -17,6 +17,8 @@ export async function listDepartments() {
       sortOrder: department.sortOrder,
       notes: department.notes,
       memberCount: count(userMembership.sub),
+      assetCount: db.$count(asset, eq(asset.departmentId, department.id)),
+      requestCount: db.$count(request, eq(request.departmentId, department.id)),
     })
     .from(department)
     .leftJoin(userMembership, eq(userMembership.departmentId, department.id))
@@ -48,8 +50,19 @@ export async function updateDepartment(id: string, values: z.infer<typeof depart
     .where(eq(department.id, id));
 }
 
-// 部署を削除します。
+// 所属・資産・申請のどれもない部署を削除し、削除できたかを返します。
 export async function deleteDepartment(id: string) {
   await getAdmin();
-  await db.delete(department).where(eq(department.id, id));
+  const deleted = await db
+    .delete(department)
+    .where(
+      and(
+        eq(department.id, id),
+        notExists(db.select().from(userMembership).where(eq(userMembership.departmentId, id))),
+        notExists(db.select().from(asset).where(eq(asset.departmentId, id))),
+        notExists(db.select().from(request).where(eq(request.departmentId, id))),
+      ),
+    )
+    .returning({ id: department.id });
+  return deleted.length > 0;
 }

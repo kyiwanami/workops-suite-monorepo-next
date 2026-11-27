@@ -15,12 +15,15 @@ import { Field, FieldError, FieldGroup, FieldLabel } from '@workops/ui/component
 import { Input } from '@workops/ui/components/input';
 import { Textarea } from '@workops/ui/components/textarea';
 import { ConfirmButton } from '@workops/ui/workops/confirm-button';
+import { FormFailure } from '@workops/ui/workops/form-failure';
 import { SubmitButton } from '@workops/ui/workops/submit-button';
 import { type ReactNode, useState } from 'react';
+import { unstable_rethrow, useRouter } from 'next/navigation';
 import { Controller, useForm } from 'react-hook-form';
 import { createAssetTypeAction, deleteAssetTypeAction, updateAssetTypeAction } from '@/server/asset-types/actions';
 import type { AssetTypeRow } from '@/server/asset-types/data';
 import { assetTypeSchema } from '@workops/schema/asset-types';
+import { serializeAssetTypeSearchParams } from '../search-params';
 
 // 資産種別の登録・編集のフォームです。ダイアログを開くたびに作り直し、種別の今の値から始めます。編集ではコードを変えられません。
 // 登録でコードがすでに使われていたら、コードの項目にその旨を出します。資産がある種別は削除できないため、件数と変更の場所を書きます。
@@ -29,7 +32,7 @@ function AssetTypeForm({
   onSaved,
 }: {
   assetType: AssetTypeRow | null;
-  onSaved: () => void;
+  onSaved: (done: 'created' | 'saved') => void;
 }) {
   const form = useForm({
     resolver: zodResolver(assetTypeSchema),
@@ -44,13 +47,20 @@ function AssetTypeForm({
   return (
     <form
       onSubmit={form.handleSubmit(async (values) => {
-        if (assetType !== null) {
-          await updateAssetTypeAction(assetType.id, values);
-          onSaved();
-        } else if (await createAssetTypeAction(values)) {
-          onSaved();
-        } else {
-          form.setError('code', { message: 'このコードはすでに使われています。別のコードを入力してください。' });
+        try {
+          if (assetType !== null) {
+            await updateAssetTypeAction(assetType.id, values);
+            onSaved('saved');
+          } else if (await createAssetTypeAction(values)) {
+            onSaved('created');
+          } else {
+            form.setError('code', { message: 'このコードはすでに使われています。別のコードを入力してください。' });
+          }
+        } catch (error) {
+          // 画面の移動などは Next に任せ、予期しない失敗はボタンの近くに出す
+          unstable_rethrow(error);
+          console.error(error);
+          form.setError('root', { message: '保存できませんでした。時間をおいて、もう一度お試しください。' });
         }
       })}
       className="grid gap-6"
@@ -119,6 +129,7 @@ function AssetTypeForm({
           この種別の資産が {assetType.assetCount} 件あります。削除するには、資産の種別を変更してください。
         </p>
       )}
+      <FormFailure error={form.formState.errors.root} />
       <DialogFooter className="sm:justify-between">
         {assetType !== null && assetType.assetCount === 0 && (
           <ConfirmButton
@@ -153,6 +164,7 @@ export function AssetTypeDialog({
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const router = useRouter();
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
@@ -160,7 +172,11 @@ export function AssetTypeDialog({
         <DialogHeader>
           <DialogTitle>{assetType === null ? '種別を登録する' : '種別を編集する'}</DialogTitle>
         </DialogHeader>
-        <AssetTypeForm assetType={assetType} onSaved={() => setOpen(false)} />
+        <AssetTypeForm assetType={assetType} onSaved={(done) => {
+            // 登録・保存した旨を一覧の題の下に出す
+            router.replace(serializeAssetTypeSearchParams('/asset-types', { done }), { scroll: false });
+            setOpen(false);
+          }} />
       </DialogContent>
     </Dialog>
   );

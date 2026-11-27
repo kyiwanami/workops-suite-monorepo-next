@@ -16,13 +16,16 @@ import { Input } from '@workops/ui/components/input';
 import { RadioGroup, RadioGroupItem } from '@workops/ui/components/radio-group';
 import { Textarea } from '@workops/ui/components/textarea';
 import { ConfirmButton } from '@workops/ui/workops/confirm-button';
+import { FormFailure } from '@workops/ui/workops/form-failure';
 import { SubmitButton } from '@workops/ui/workops/submit-button';
 import { type ReactNode, useState } from 'react';
+import { unstable_rethrow, useRouter } from 'next/navigation';
 import { Controller, useForm } from 'react-hook-form';
 import { createPageAction, deletePageAction, updatePageAction } from '@/server/apps/actions';
 import type { AppRow } from '@/server/apps/data';
 import { pageRoleLabels } from '../labels';
 import { pageSchema } from '../schema';
+import { serializeAppSearchParams } from '../search-params';
 
 // ページの登録・編集のフォームです。ダイアログを開くたびに作り直し、ページの今の値から始めます。編集ではページ ID を変えられません。
 // 登録でページ ID がすでに使われていたら、ページ ID の項目にその旨を出します。
@@ -33,7 +36,7 @@ function PageForm({
 }: {
   appId: string;
   page: AppRow['pages'][number] | null;
-  onSaved: () => void;
+  onSaved: (done: 'pageCreated' | 'pageSaved') => void;
 }) {
   const form = useForm({
     resolver: zodResolver(pageSchema),
@@ -49,13 +52,20 @@ function PageForm({
   return (
     <form
       onSubmit={form.handleSubmit(async (values) => {
-        if (page !== null) {
-          await updatePageAction(values);
-          onSaved();
-        } else if (await createPageAction(values)) {
-          onSaved();
-        } else {
-          form.setError('pageId', { message: 'このページ ID はすでに使われています。' });
+        try {
+          if (page !== null) {
+            await updatePageAction(values);
+            onSaved('pageSaved');
+          } else if (await createPageAction(values)) {
+            onSaved('pageCreated');
+          } else {
+            form.setError('pageId', { message: 'このページ ID はすでに使われています。' });
+          }
+        } catch (error) {
+          // 画面の移動などは Next に任せ、予期しない失敗はボタンの近くに出す
+          unstable_rethrow(error);
+          console.error(error);
+          form.setError('root', { message: '保存できませんでした。時間をおいて、もう一度お試しください。' });
         }
       })}
       className="grid gap-6"
@@ -137,6 +147,7 @@ function PageForm({
           )}
         />
       </FieldGroup>
+      <FormFailure error={form.formState.errors.root} />
       <DialogFooter className="sm:justify-between">
         {page !== null && (
           <ConfirmButton
@@ -173,6 +184,7 @@ export function PageDialog({
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const router = useRouter();
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
@@ -180,7 +192,11 @@ export function PageDialog({
         <DialogHeader>
           <DialogTitle>{page === null ? 'ページを追加する' : 'ページを編集する'}</DialogTitle>
         </DialogHeader>
-        <PageForm appId={appId} page={page} onSaved={() => setOpen(false)} />
+        <PageForm appId={appId} page={page} onSaved={(done) => {
+            // 登録・保存した旨を一覧の題の下に出す
+            router.replace(serializeAppSearchParams('/admin/apps', { done }), { scroll: false });
+            setOpen(false);
+          }} />
       </DialogContent>
     </Dialog>
   );

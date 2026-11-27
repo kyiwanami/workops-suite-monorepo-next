@@ -15,16 +15,19 @@ import { Field, FieldError, FieldGroup, FieldLabel } from '@workops/ui/component
 import { Input } from '@workops/ui/components/input';
 import { Textarea } from '@workops/ui/components/textarea';
 import { ConfirmButton } from '@workops/ui/workops/confirm-button';
+import { FormFailure } from '@workops/ui/workops/form-failure';
 import { SubmitButton } from '@workops/ui/workops/submit-button';
 import { type ReactNode, useState } from 'react';
+import { unstable_rethrow, useRouter } from 'next/navigation';
 import { Controller, useForm } from 'react-hook-form';
 import { createRequestTypeAction, deleteRequestTypeAction, updateRequestTypeAction } from '@/server/request-types/actions';
 import type { RequestTypeRow } from '@/server/request-types/data';
 import { requestTypeSchema } from '@workops/schema/request-types';
+import { serializeRequestTypeSearchParams } from '../search-params';
 
 // 申請種別の登録・編集のフォームです。ダイアログを開くたびに作り直し、種別の今の値から始めます。コードも編集できます。
 // 申請が使っている種別は削除できないため、件数を書き、削除を出しません。
-function RequestTypeForm({ requestType, onSaved }: { requestType: RequestTypeRow | null; onSaved: () => void }) {
+function RequestTypeForm({ requestType, onSaved }: { requestType: RequestTypeRow | null; onSaved: (done: 'created' | 'saved') => void }) {
   const form = useForm({
     resolver: zodResolver(requestTypeSchema),
     defaultValues: {
@@ -38,12 +41,19 @@ function RequestTypeForm({ requestType, onSaved }: { requestType: RequestTypeRow
   return (
     <form
       onSubmit={form.handleSubmit(async (values) => {
-        if (requestType === null) {
-          await createRequestTypeAction(values);
-        } else {
-          await updateRequestTypeAction(requestType.id, values);
+        try {
+          if (requestType === null) {
+            await createRequestTypeAction(values);
+          } else {
+            await updateRequestTypeAction(requestType.id, values);
+          }
+          onSaved(requestType === null ? 'created' : 'saved');
+        } catch (error) {
+          // 画面の移動などは Next に任せ、予期しない失敗はボタンの近くに出す
+          unstable_rethrow(error);
+          console.error(error);
+          form.setError('root', { message: '保存できませんでした。時間をおいて、もう一度お試しください。' });
         }
-        onSaved();
       })}
       className="grid gap-6"
     >
@@ -102,6 +112,7 @@ function RequestTypeForm({ requestType, onSaved }: { requestType: RequestTypeRow
       {requestType !== null && requestType.requestCount > 0 && (
         <p className="text-sm text-muted-foreground">この種別を使っている申請が {requestType.requestCount} 件あるため、削除できません。</p>
       )}
+      <FormFailure error={form.formState.errors.root} />
       <DialogFooter className="sm:justify-between">
         {requestType !== null && requestType.requestCount === 0 && (
           <ConfirmButton
@@ -130,6 +141,7 @@ function RequestTypeForm({ requestType, onSaved }: { requestType: RequestTypeRow
 // 申請種別の登録・編集のダイアログです。種別を渡すと編集、渡さないと登録になります。保存したら閉じます。
 export function RequestTypeDialog({ requestType, children }: { requestType: RequestTypeRow | null; children: ReactNode }) {
   const [open, setOpen] = useState(false);
+  const router = useRouter();
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
@@ -137,7 +149,11 @@ export function RequestTypeDialog({ requestType, children }: { requestType: Requ
         <DialogHeader>
           <DialogTitle>{requestType === null ? '種別を登録する' : '種別を編集する'}</DialogTitle>
         </DialogHeader>
-        <RequestTypeForm requestType={requestType} onSaved={() => setOpen(false)} />
+        <RequestTypeForm requestType={requestType} onSaved={(done) => {
+            // 登録・保存した旨を一覧の題の下に出す
+            router.replace(serializeRequestTypeSearchParams('/request-types', { done }), { scroll: false });
+            setOpen(false);
+          }} />
       </DialogContent>
     </Dialog>
   );

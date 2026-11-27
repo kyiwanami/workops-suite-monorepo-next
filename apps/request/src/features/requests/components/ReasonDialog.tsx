@@ -14,12 +14,12 @@ import {
 } from '@workops/ui/components/dialog';
 import { Field, FieldError, FieldLabel } from '@workops/ui/components/field';
 import { Textarea } from '@workops/ui/components/textarea';
+import { FormFailure } from '@workops/ui/workops/form-failure';
 import { SubmitButton } from '@workops/ui/workops/submit-button';
-import { useState } from 'react';
+import { unstable_rethrow } from 'next/navigation';
 import { Controller, useForm } from 'react-hook-form';
 import { rejectRequestAction, returnRequestAction } from '@/server/requests/actions';
 import { reasonSchema } from '@workops/schema/requests';
-import { OperationError } from './OperationError';
 
 // 却下・差戻しの文言です。確認の本文には操作の結果を書きます。
 const texts = {
@@ -53,7 +53,6 @@ export function ReasonDialog({
   requesterName: string | null;
   kind: keyof typeof texts;
 }) {
-  const [failed, setFailed] = useState(false);
   const form = useForm({ resolver: zodResolver(reasonSchema), defaultValues: { reason: '' } });
   const text = texts[kind];
   return (
@@ -66,12 +65,13 @@ export function ReasonDialog({
       <DialogContent className="max-md:top-auto max-md:bottom-0 max-md:max-w-none! max-md:translate-y-0 max-md:rounded-b-none md:max-w-[440px]">
         <form
           onSubmit={form.handleSubmit(async (values) => {
-            setFailed(false);
             try {
               await (kind === 'reject' ? rejectRequestAction(requestId, values) : returnRequestAction(requestId, values));
             } catch (error) {
+              // 操作のあとの画面の移動は、Next に任せる
+              unstable_rethrow(error);
               console.error(error);
-              setFailed(true);
+              form.setError('root', { message: '操作できませんでした。時間をおいて、もう一度お試しください。' });
             }
           })}
           className="grid gap-4"
@@ -91,7 +91,7 @@ export function ReasonDialog({
               </Field>
             )}
           />
-          {failed && <OperationError title="操作できませんでした" description="保存済みの申請を確認してください。" requestId={requestId} />}
+          <FormFailure error={form.formState.errors.root} />
           <DialogFooter>
             <DialogClose asChild>
               <Button variant="outline">やめる</Button>

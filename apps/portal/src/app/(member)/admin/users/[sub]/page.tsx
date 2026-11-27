@@ -1,10 +1,13 @@
+import { Alert, AlertTitle } from '@workops/ui/components/alert';
 import { Badge } from '@workops/ui/components/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@workops/ui/components/card';
 import Link from 'next/link';
+import type { SearchParams } from 'nuqs/server';
 import { AccountActions } from '@/features/users/components/AccountActions';
 import { MembershipForm } from '@/features/users/components/MembershipForm';
 import { getUser, listDepartmentOptions } from '@/server/users/data';
 import { statusBadges } from '@/features/users/labels';
+import { loadUserDetailSearchParams } from '@/features/users/search-params';
 
 // 日時を「2026/11/10 14:30」の形にします。
 const dateTimeFormat = new Intl.DateTimeFormat('ja-JP', {
@@ -17,8 +20,11 @@ const dateTimeFormat = new Intl.DateTimeFormat('ja-JP', {
 });
 
 // ユーザーの詳細です。状態の表示とアカウントの操作、所属の保存、アカウントの情報を並べます。
-export default async function UserPage({ params }: { params: Promise<{ sub: string }> }) {
-  const { sub } = await params;
+// 有効・無効にして戻ったときの文言です。
+const doneMessages = { enabled: 'ユーザーを有効にしました', disabled: 'ユーザーを無効にしました' };
+
+export default async function UserPage({ params, searchParams }: { params: Promise<{ sub: string }>; searchParams: Promise<SearchParams> }) {
+  const [{ sub }, { done }] = await Promise.all([params, loadUserDetailSearchParams(searchParams)]);
   const [user, departments] = await Promise.all([getUser(sub), listDepartmentOptions()]);
   const displayName = user.name ?? user.email;
   const badge = statusBadges[user.status];
@@ -38,6 +44,11 @@ export default async function UserPage({ params }: { params: Promise<{ sub: stri
         status={user.status}
         badge={<Badge variant={badge.variant}>{badge.label}</Badge>}
       />
+      {done !== null && (
+        <Alert variant="success">
+          <AlertTitle>{doneMessages[done]}</AlertTitle>
+        </Alert>
+      )}
       <MembershipForm sub={user.sub} departments={departments} membership={user.membership} />
       <Card>
         <CardHeader>

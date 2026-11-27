@@ -30,13 +30,13 @@ export function UserPagination({
             <PaginationItem>
               <PaginationPrevious
                 text="前へ"
-                href={serializeUserSearchParams('/admin/users', { ...params, page: params.page - 1 })}
+                href={serializeUserSearchParams('/admin/users', { ...params, page: params.page - 1, done: null })}
               />
             </PaginationItem>
           )}
           {start + count < total && (
             <PaginationItem>
-              <PaginationNext text="次へ" href={serializeUserSearchParams('/admin/users', { ...params, page: params.page + 1 })} />
+              <PaginationNext text="次へ" href={serializeUserSearchParams('/admin/users', { ...params, page: params.page + 1, done: null })} />
             </PaginationItem>
           )}
         </PaginationContent>

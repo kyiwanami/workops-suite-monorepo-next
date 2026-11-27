@@ -1,3 +1,4 @@
+import { Alert, AlertTitle } from '@workops/ui/components/alert';
 import type { SearchParams } from 'nuqs/server';
 import { CreateUser } from '@/features/users/components/CreateUser';
 import { UserFilters } from '@/features/users/components/UserFilters';
@@ -13,6 +14,11 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
   return (
     <>
       <CreateUser departments={departments} />
+      {params.done === 'deleted' && (
+        <Alert variant="success">
+          <AlertTitle>ユーザーを削除しました</AlertTitle>
+        </Alert>
+      )}
       <UserFilters departments={departments} />
       <UserTable users={result.users} />
       {result.total > 0 && (

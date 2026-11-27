@@ -6,9 +6,11 @@ import { ConfirmButton } from '@workops/ui/workops/confirm-button';
 import { PageHeader } from '@workops/ui/workops/page-header';
 import { CircleX, CornerUpLeft } from 'lucide-react';
 import Link from 'next/link';
+import type { SearchParams } from 'nuqs/server';
 import { approveRequestAction, deleteRequestAction, withdrawRequestAction } from '@/server/requests/actions';
 import { ActionBar } from '@/features/requests/components/ActionBar';
 import { ReasonDialog } from '@/features/requests/components/ReasonDialog';
+import { loadRequestDetailSearchParams } from '@/features/requests/search-params';
 import { RequestForm } from '@/features/requests/components/RequestForm';
 import { getRequest, listRequestTypeOptions } from '@/server/requests/data';
 import { formatAmount, formatDateTime, requestStatusBadges } from '@workops/ui/lib/labels';
@@ -17,8 +19,9 @@ import { getMember } from '@/server/user';
 // 申請の詳細です。状態・ロール・本人条件に応じて操作を出し分けます。
 // 本人の下書きは入力欄で出し、その場で直して提出できます。承認者には他者の提出済みの申請に「却下」「差戻し」「承認」を出します。
 // 差し戻された下書きと却下された申請には、理由と日時を上部に出します。経過は申請の日時の項目から出します。
-export default async function RequestPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+// 申請の今の状態で操作できずに戻ったときは、操作の近くにその旨を出します。
+export default async function RequestPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<SearchParams> }) {
+  const [{ id }, { failed }] = await Promise.all([params, loadRequestDetailSearchParams(searchParams)]);
   const [member, request] = await Promise.all([getMember(), getRequest(id)]);
   const operations = getOperations(member, request);
   const requestTypes = operations.update ? await listRequestTypeOptions(true) : [];
@@ -78,6 +81,12 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
           </div>
         )}
       </PageHeader>
+      {failed === true && (
+        <Alert variant="destructive">
+          <AlertTitle>操作できませんでした</AlertTitle>
+          <AlertDescription>ほかの操作で申請の状態が変わっていました。最新の状態を表示しています。</AlertDescription>
+        </Alert>
+      )}
       {request.status === 'draft' && request.returnedAt !== null && (
         <Alert variant="warning">
           <CornerUpLeft />

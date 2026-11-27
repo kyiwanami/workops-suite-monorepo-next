@@ -240,8 +240,8 @@ function matchDecisions(events: Event[], message: UIMessage) {
     const approval = approvals.get(toolUse.toolUseId);
     return approval === undefined ? [] : [{ toolUse, approval }];
   });
-  // 判断なし、または判断待ちでない呼び出しへの判断を含むなら null
-  if (decisions.length === 0 || decisions.length !== approvals.size) {
+  // 判断待ちの全部に判断がそろわない、または判断待ちでない呼び出しへの判断を含むなら null
+  if (decisions.length === 0 || decisions.length !== pending.length || decisions.length !== approvals.size) {
     return null;
   }
   return decisions;
@@ -379,13 +379,17 @@ async function converse(input: {
 }) {
   const { sub, conversationId, token, gateway, readTools, tools } = input;
   const prompt = await convertToModelMessages(input.prompts);
+  // 失敗を記録し、画面に返す文言
+  const failed = () => {
+    log({ sub, conversationId, event: 'invoke', error: 'failed' });
+    return messages.failed;
+  };
   const stream = createUIMessageStream({
     originalMessages: [input.message],
     generateId,
     onError: (error) => {
       console.error(error);
-      log({ sub, conversationId, event: 'invoke', error: 'failed' });
-      return messages.failed;
+      return failed();
     },
     execute: ({ writer }) => {
       const result = streamText({
@@ -408,7 +412,16 @@ async function converse(input: {
           return gateway.close();
         },
       });
-      writer.merge(toUIMessageStream({ stream: result.stream }));
+      // Harness が逐次返している途中の失敗
+      writer.merge(
+        toUIMessageStream({
+          stream: result.stream,
+          onError: (error) => {
+            console.error(error);
+            return failed();
+          },
+        }),
+      );
     },
   });
   return createUIMessageStreamResponse({ stream });

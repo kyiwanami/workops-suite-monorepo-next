@@ -1,9 +1,11 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import type { z } from 'zod';
 import { createApp, createPage, deleteApp, deletePage, updateApp, updatePage } from './data';
 import { appSchema, pageSchema } from '@/features/apps/schema';
+import { serializeAppSearchParams } from '@/features/apps/search-params';
 
 // 入力を検証してアプリを登録し、管理の一覧とホームを最新にします。アプリ ID がすでに使われていたら false を返します。
 export async function createAppAction(input: z.infer<typeof appSchema>) {
@@ -25,6 +27,7 @@ export async function deleteAppAction(formData: FormData) {
   await deleteApp(String(formData.get('appId')));
   revalidatePath('/admin/apps');
   revalidatePath('/');
+  redirect(serializeAppSearchParams('/admin/apps', { done: 'appDeleted' }));
 }
 
 // 入力を検証してページを登録し、管理の一覧とホームを最新にします。ページ ID がすでに使われていたら false を返します。
@@ -47,4 +50,5 @@ export async function deletePageAction(formData: FormData) {
   await deletePage(String(formData.get('appId')), String(formData.get('pageId')));
   revalidatePath('/admin/apps');
   revalidatePath('/');
+  redirect(serializeAppSearchParams('/admin/apps', { done: 'pageDeleted' }));
 }

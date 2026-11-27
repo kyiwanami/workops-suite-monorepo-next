@@ -15,9 +15,11 @@ import {
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@workops/ui/components/field';
 import { Input } from '@workops/ui/components/input';
 import { PageHeader } from '@workops/ui/workops/page-header';
+import { FormFailure } from '@workops/ui/workops/form-failure';
 import { SubmitButton } from '@workops/ui/workops/submit-button';
 import Link from 'next/link';
 import { useState } from 'react';
+import { unstable_rethrow } from 'next/navigation';
 import { Controller, useForm } from 'react-hook-form';
 import { createUserAction } from '@/server/users/actions';
 import type { DepartmentOption } from '@/server/users/data';
@@ -41,11 +43,18 @@ function CreateUserForm({
   return (
     <form
       onSubmit={form.handleSubmit(async (values) => {
-        const output = await createUserAction(values);
-        if (output.result === 'exists') {
-          form.setError('email', { message: 'このメールのユーザーはすでにいます。' });
-        } else {
-          onCreated(output);
+        try {
+          const output = await createUserAction(values);
+          if (output.result === 'exists') {
+            form.setError('email', { message: 'このメールのユーザーはすでにいます。' });
+          } else {
+            onCreated(output);
+          }
+        } catch (error) {
+          // 画面の移動などは Next に任せ、予期しない失敗はボタンの近くに出す
+          unstable_rethrow(error);
+          console.error(error);
+          form.setError('root', { message: '作成できませんでした。時間をおいて、もう一度お試しください。' });
         }
       })}
       className="grid gap-6"
@@ -85,6 +94,7 @@ function CreateUserForm({
           render={({ field, fieldState }) => <RoleField value={field.value} onChange={field.onChange} fieldState={fieldState} />}
         />
       </FieldGroup>
+      <FormFailure error={form.formState.errors.root} />
       <DialogFooter>
         <DialogClose asChild>
           <Button variant="outline">やめる</Button>
