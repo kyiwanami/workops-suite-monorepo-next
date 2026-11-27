@@ -1,0 +1,18 @@
+<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .accent { stroke: #0f8f80; fill: none; }
+    .head { fill: #0f8f80; stroke: #0f8f80; }
+    .mark { stroke: #2459d6; fill: none; }
+    @media (prefers-color-scheme: dark) {
+      .accent { stroke: #3fd2bf; }
+      .head { fill: #3fd2bf; stroke: #3fd2bf; }
+      .mark { stroke: #6f9cff; }
+    }
+  </style>
+  <g transform="translate(0 1)">
+    <path class="accent" d="M59.05 29.75 A28 12 -15 0 0 4.95 44.25" stroke-width="4" stroke-linecap="round" opacity="0.4" />
+    <path class="mark" d="M10 14 L21 47 L32 22 L43 47 L54 14" stroke-width="11" stroke-linecap="round" stroke-linejoin="round" />
+    <path class="accent" d="M4.95 44.25 A28 12 -15 0 0 58.47 34.15" stroke-width="6" stroke-linecap="round" />
+    <path class="head" d="M61.5 27.8 L63.4 37.6 L52.6 32.5 Z" stroke-width="1.5" stroke-linejoin="round" />
+  </g>
+</svg>

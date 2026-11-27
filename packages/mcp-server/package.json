@@ -15,8 +15,7 @@
     "@modelcontextprotocol/server": "2.4.0",
     "@workops/domain": "*",
     "@workops/schema": "*",
-    "hono": "4.13.22",
-    "zod": "4.6.7"
+    "hono": "4.13.22"
   },
   "devDependencies": {
     "@types/node": "24.19.2"

@@ -27,12 +27,10 @@
     "ai": "7.0.183",
     "aws-cdk-lib": "2.275.0",
     "aws-jwt-verify": "5.2.1",
+    "cdk-monitoring-constructs": "11.0.0",
     "constructs": "10.8.1",
     "esbuild": "0.28.2",
     "hono": "4.13.22",
     "zod": "4.6.7"
-  },
-  "dependencies": {
-    "cdk-monitoring-constructs": "11.0.0"
   }
 }
