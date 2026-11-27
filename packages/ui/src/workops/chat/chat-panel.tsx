@@ -1,20 +1,31 @@
 'use client';
 
+import { Chat as AiChat } from '@ai-sdk/react';
+import { dataPartSchemas } from '@workops/schema/chat';
 import { Button } from '@workops/ui/components/button';
 import { Sheet, SheetContent, SheetTitle } from '@workops/ui/components/sheet';
 import { useIsMobile } from '@workops/ui/hooks/use-mobile';
+import { DefaultChatTransport, lastAssistantMessageIsCompleteWithApprovalResponses } from 'ai';
 import type { ChatMessage } from './chat';
 import { HistoryIcon, PlusIcon, XIcon } from 'lucide-react';
 import dynamic from 'next/dynamic';
+import { useRouter } from 'next/navigation';
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import { AiGlyph } from './ai-glyph';
+import { chatFetch } from './chat-fetch';
 
-// 会話と会話の一覧の部品です。AI SDK と Markdown の表示を含むため、パネルを開いたときに読み込みます。
+// 会話と会話の一覧の部品です。Markdown の表示を含むため、パネルを開いたときに読み込みます。
 const Chat = dynamic(() => import('./chat').then((module) => module.Chat));
 const ConversationList = dynamic(() => import('./conversation-list').then((module) => module.ConversationList));
 
-// AIのパネルの開閉です。起動ボタンとパネルで共有します。
-const PanelContext = createContext<{ open: boolean; setOpen: (open: boolean) => void } | null>(null);
+// AIのパネルの開閉と、進めている会話です。起動ボタンとパネルで共有します。
+const PanelContext = createContext<{
+  chatApiUrl: string;
+  open: boolean;
+  setOpen: (open: boolean) => void;
+  chat: AiChat<ChatMessage>;
+  openChat: (id: string, messages: ChatMessage[]) => void;
+} | null>(null);
 
 function usePanel() {
   const panel = useContext(PanelContext);
@@ -24,10 +35,37 @@ function usePanel() {
   return panel;
 }
 
-// AIのパネルの開閉を、起動ボタンとパネルで共有します。最初は閉じておきます。
-export function ChatProvider({ children }: { children: ReactNode }) {
+// AIのパネルの開閉と会話を、起動ボタンとパネルで共有します。最初は閉じておき、新しい会話を用意します。
+// 会話はここで持ち、画面の幅をまたいでパネルの形が変わっても残します。
+// チャットのAPIには、会話のIDと最後のメッセージだけを送ります。確認カードの判断がそろったら、自動で送ります。
+export function ChatProvider({ chatApiUrl, children }: { chatApiUrl: string; children: ReactNode }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
-  return <PanelContext.Provider value={{ open, setOpen }}>{children}</PanelContext.Provider>;
+  const createChat = (id: string, messages: ChatMessage[]) =>
+    new AiChat<ChatMessage>({
+      id,
+      messages,
+      dataPartSchemas,
+      transport: new DefaultChatTransport({
+        api: new URL('chat', chatApiUrl).href,
+        fetch: chatFetch,
+        prepareSendMessagesRequest: ({ id, messages }) => ({ body: { id, message: messages.at(-1) } }),
+      }),
+      sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
+      // 書込みのツールを実行したら、開いているページを読み直して結果を表示します。
+      onData: (part) => {
+        if (part.type === 'data-result') {
+          router.refresh();
+        }
+      },
+    });
+  // 新しい会話のIDは画面で作ります。
+  const [chat, setChat] = useState(() => createChat(crypto.randomUUID(), []));
+  return (
+    <PanelContext.Provider value={{ chatApiUrl, open, setOpen, chat, openChat: (id, messages) => setChat(createChat(id, messages)) }}>
+      {children}
+    </PanelContext.Provider>
+  );
 }
 
 // 画面右下の「AIに頼む」ボタンです。パネルを開いている間は隠し、閉じたらこのボタンにフォーカスを戻します。
@@ -58,16 +96,10 @@ export function ChatLauncher() {
   );
 }
 
-// 新しい会話です。会話のIDは画面で作ります。
-function newConversation(): { id: string; messages: ChatMessage[] } {
-  return { id: crypto.randomUUID(), messages: [] };
-}
-
 // パネルの中身です。見出し（AIの印・会話の一覧・新しい会話・閉じる）、会話、会話の一覧です。
 // 一覧を見ている間も進めている会話を残すため、会話は隠すだけにします。
-function PanelBody({ chatApiUrl }: { chatApiUrl: string }) {
-  const { setOpen } = usePanel();
-  const [conversation, setConversation] = useState(newConversation);
+function PanelBody() {
+  const { chatApiUrl, setOpen, chat, openChat } = usePanel();
   const [listing, setListing] = useState(false);
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -82,7 +114,7 @@ function PanelBody({ chatApiUrl }: { chatApiUrl: string }) {
           variant="ghost"
           size="icon"
           onClick={() => {
-            setConversation(newConversation());
+            openChat(crypto.randomUUID(), []);
             setListing(false);
           }}
         >
@@ -98,13 +130,13 @@ function PanelBody({ chatApiUrl }: { chatApiUrl: string }) {
         <ConversationList
           chatApiUrl={chatApiUrl}
           onOpen={(opened) => {
-            setConversation(opened);
+            openChat(opened.id, opened.messages);
             setListing(false);
           }}
         />
       )}
       <div className={listing ? 'hidden' : 'flex min-h-0 flex-1 flex-col'}>
-        <Chat key={conversation.id} chatApiUrl={chatApiUrl} id={conversation.id} messages={conversation.messages} />
+        <Chat key={chat.id} chat={chat} />
       </div>
     </div>
   );
@@ -114,7 +146,7 @@ function PanelBody({ chatApiUrl }: { chatApiUrl: string }) {
 // - 1280px 以上：ページを隠さず、右に幅 400px で並べます。一覧を見ながら依頼できるようにするためです。高さはヘッダー（h-14）を除いた画面の高さです
 // - 1280px 未満：一覧の列が詰まって読めなくならないよう、ページの上に重ねます
 // - スマートフォン：下から全画面のシートで開きます
-export function ChatPanel({ chatApiUrl }: { chatApiUrl: string }) {
+export function ChatPanel() {
   const { open, setOpen } = usePanel();
   const mobile = useIsMobile();
   const [opened, setOpened] = useState(false);
@@ -133,7 +165,7 @@ export function ChatPanel({ chatApiUrl }: { chatApiUrl: string }) {
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent side="bottom" showCloseButton={false} className="gap-0 bg-card p-0 data-[side=bottom]:h-svh">
           <SheetTitle className="sr-only">AIアシスタント</SheetTitle>
-          <PanelBody chatApiUrl={chatApiUrl} />
+          <PanelBody />
         </SheetContent>
       </Sheet>
     );
@@ -146,7 +178,7 @@ export function ChatPanel({ chatApiUrl }: { chatApiUrl: string }) {
           : 'hidden'
       }
     >
-      <PanelBody chatApiUrl={chatApiUrl} />
+      <PanelBody />
     </aside>
   );
 }

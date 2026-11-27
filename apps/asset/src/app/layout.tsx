@@ -22,13 +22,13 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       <body>
         <NuqsAdapter>
           <ThemeProvider nonce={scriptNonce}>
-            <ChatProvider>
+            <ChatProvider chatApiUrl={chatApiUrl}>
               <Suspense>
                 <Header />
               </Suspense>
               <div className="flex">
                 <div className="min-w-0 flex-1 pb-18">{children}</div>
-                <ChatPanel chatApiUrl={chatApiUrl} />
+                <ChatPanel />
               </div>
               <ChatLauncher />
             </ChatProvider>

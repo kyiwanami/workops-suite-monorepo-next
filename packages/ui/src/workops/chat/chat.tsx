@@ -1,6 +1,6 @@
 'use client';
 
-import { useChat } from '@ai-sdk/react';
+import { type Chat as AiChat, useChat } from '@ai-sdk/react';
 import { Alert, AlertAction, AlertDescription } from '@workops/ui/components/alert';
 import { Bubble, BubbleContent } from '@workops/ui/components/bubble';
 import { Button } from '@workops/ui/components/button';
@@ -15,19 +15,11 @@ import {
   MessageScrollerViewport,
 } from '@workops/ui/components/message-scroller';
 import { Spinner } from '@workops/ui/components/spinner';
-import { dataPartSchemas } from '@workops/schema/chat';
-import {
-  DefaultChatTransport,
-  type InferUIDataParts,
-  isDynamicToolUIPart,
-  isTextUIPart,
-  lastAssistantMessageIsCompleteWithApprovalResponses,
-  type UIMessage,
-} from 'ai';
+import type { dataPartSchemas } from '@workops/schema/chat';
+import { type InferUIDataParts, isDynamicToolUIPart, isTextUIPart, type UIMessage } from 'ai';
 import { SendIcon } from 'lucide-react';
 import { type FormEvent, useRef, useState } from 'react';
 import { Streamdown } from 'streamdown';
-import { chatFetch } from './chat-fetch';
 import { toolTitle, ToolPart } from './tool-part';
 
 // 確認カードのデータパート（対象の値と実行の日時）の型を付けた、AI SDK のメッセージです。
@@ -47,19 +39,8 @@ function waitingText(messages: ChatMessage[]) {
 }
 
 // AIとの1つの会話です。依頼を送り、回答を逐次表示し、書込みのツールは確認カードで確定させます。
-// チャットのAPIには、会話のIDと最後のメッセージだけを送ります。確認カードの判断がそろったら、自動で送ります。
-export function Chat({ chatApiUrl, id, messages: history }: { chatApiUrl: string; id: string; messages: ChatMessage[] }) {
-  const { messages, sendMessage, addToolApprovalResponse, status, stop, error, regenerate } = useChat<ChatMessage>({
-    id,
-    messages: history,
-    dataPartSchemas,
-    transport: new DefaultChatTransport({
-      api: new URL('chat', chatApiUrl).href,
-      fetch: chatFetch,
-      prepareSendMessagesRequest: ({ id, messages }) => ({ body: { id, message: messages.at(-1) } }),
-    }),
-    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
-  });
+export function Chat({ chat }: { chat: AiChat<ChatMessage> }) {
+  const { messages, sendMessage, addToolApprovalResponse, status, stop, error, regenerate } = useChat({ chat });
   const [text, setText] = useState('');
   const formRef = useRef<HTMLFormElement>(null);
   const busy = status === 'submitted' || status === 'streaming';
@@ -100,7 +81,8 @@ export function Chat({ chatApiUrl, id, messages: history }: { chatApiUrl: string
                 ) : (
                   // AIの回答は吹き出しにせず、箇条書きや一覧を読めるようパネルの全幅に本文として表示します。
                   <MessageScrollerItem key={message.id} messageId={message.id}>
-                    <div className="flex flex-col gap-3">
+                    {/* 読み上げは最新の回答だけにし、長い履歴を一度に読み上げないようにします。作っている間は読み上げを待たせ、できあがってから読み上げます。 */}
+                    <div className="flex flex-col gap-3" {...(message === messages.at(-1) ? { 'aria-live': 'polite', 'aria-busy': busy } : {})}>
                       {message.parts.map((part, index) => {
                         if (part.type === 'text') {
                           return (
@@ -122,15 +104,18 @@ export function Chat({ chatApiUrl, id, messages: history }: { chatApiUrl: string
                   </MessageScrollerItem>
                 ),
               )}
-              {busy && (
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Spinner />
-                  {waitingText(messages)}
-                  <Button variant="ghost" size="sm" className="ml-auto" onClick={() => void stop()}>
-                    中止
-                  </Button>
-                </div>
-              )}
+              {/* 待っている間の表示を読み上げます。領域を先に置いておき、表示が出たときに読み上げられるようにします。 */}
+              <div aria-live="polite">
+                {busy && (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Spinner />
+                    {waitingText(messages)}
+                    <Button variant="ghost" size="sm" className="ml-auto" onClick={() => void stop()}>
+                      中止
+                    </Button>
+                  </div>
+                )}
+              </div>
               {error && (
                 <Alert variant="destructive">
                   <AlertDescription>回答を作れませんでした。もう一度お試しください。</AlertDescription>
