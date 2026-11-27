@@ -2,10 +2,9 @@ import { strict as assert } from 'node:assert';
 import { Duration, Names, type Stack } from 'aws-cdk-lib';
 import type { RestApi } from 'aws-cdk-lib/aws-apigateway';
 import type { CfnGuardrail, CfnGuardrailVersion } from 'aws-cdk-lib/aws-bedrock';
-import type { Gateway, PolicyEngine, Runtime } from 'aws-cdk-lib/aws-bedrockagentcore';
+import type { CfnHarness, Gateway, PolicyEngine, Runtime } from 'aws-cdk-lib/aws-bedrockagentcore';
 import { ComparisonOperator, TreatMissingData } from 'aws-cdk-lib/aws-cloudwatch';
-import { Function, type IFunction } from 'aws-cdk-lib/aws-lambda';
-import { FilterPattern } from 'aws-cdk-lib/aws-logs';
+import type { IFunction } from 'aws-cdk-lib/aws-lambda';
 import { Topic } from 'aws-cdk-lib/aws-sns';
 import { EmailSubscription } from 'aws-cdk-lib/aws-sns-subscriptions';
 import { MetricStatistic, MonitoringFacade, SnsAlarmActionStrategy } from 'cdk-monitoring-constructs';
@@ -13,8 +12,12 @@ import { MetricStatistic, MonitoringFacade, SnsAlarmActionStrategy } from 'cdk-m
 // アラームの通知先のメールアドレスです。デプロイのときの環境変数で指定します。
 const alarmEmail = process.env.ALARM_EMAIL;
 
-// AI機能のアラームです。条件は詳細設計の初期値で、運用後の実測で見直します。通知は SNS のトピックからメールで送ります。
-// メトリクスは5分ごとに見ます（ライブラリの既定）。
+// AI機能のアラームです。通知は、対応の要るときだけ出します。
+// - 入口（画面のチャットと、外部の MCP クライアント）で、利用者が受けた失敗を見ます
+// - AWS のサービスの失敗は、そのサービス自身のメトリクスで見ます。アプリで読み替えません
+// - 構造化ログは調べるために使い、通知の元にしません
+// - 自分たちの部品と設定の誤り、セキュリティの兆候も通知します
+// 条件は詳細設計の初期値で、運用後の実測で見直します。メトリクスは5分ごとに見ます（ライブラリの既定）。
 export function createAlarms(props: {
   stack: Stack;
   gateway: Gateway;
@@ -22,12 +25,12 @@ export function createAlarms(props: {
   policyEngine: PolicyEngine;
   api: RestApi;
   chatFunction: IFunction;
+  harness: CfnHarness;
   guardrail: CfnGuardrail;
   guardrailVersion: CfnGuardrailVersion;
 }) {
-  const { stack, gateway, runtime, policyEngine, chatFunction } = props;
+  const { stack, gateway, runtime, policyEngine, harness } = props;
   assert(alarmEmail !== undefined, '環境変数 ALARM_EMAIL に、アラームの通知先のメールアドレスを指定してください。');
-  assert(chatFunction instanceof Function);
 
   const topic = new Topic(stack, 'AlarmTopic');
   topic.addSubscription(new EmailSubscription(alarmEmail));
@@ -48,76 +51,73 @@ export function createAlarms(props: {
   const atLeast = (threshold: number) => ({
     Critical: { threshold, comparisonOperator: ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD, treatMissingDataOverride: TreatMissingData.NOT_BREACHING },
   });
+  const sum = { statistic: MetricStatistic.SUM };
 
-  // BFF：Lambda のエラーは5分で5件以上（4件を超える）、実行時間の p90 は240秒以上
+  // 入口：画面のチャットの BFF。エラー（タイムアウト・メモリ不足・起動の失敗）は5分で5件以上（4件を超える）、実行時間の p90 は240秒以上
   monitoring.monitorLambdaFunction({
-    lambdaFunction: chatFunction,
+    lambdaFunction: props.chatFunction,
     addFaultCountAlarm: { Critical: { maxErrorCount: 4 } },
     addLatencyP90Alarm: { Critical: { maxLatency: Duration.seconds(240) } },
   });
 
-  // BFF が Harness の呼び出しに失敗した回数です。構造化ログの失敗の記録から数えます。
-  const harnessErrors = chatFunction.logGroup
-    .addMetricFilter('HarnessErrors', {
-      filterPattern: FilterPattern.all(FilterPattern.stringValue('$.event', '=', 'invoke'), FilterPattern.stringValue('$.error', '=', 'failed')),
-      metricNamespace: 'Workops/Chat',
-      metricName: 'HarnessErrors',
-      metricValue: '1',
-    })
-    .metric({ statistic: MetricStatistic.SUM });
-
+  // Harness 自身のメトリクスの次元です。逐次返している途中の失敗を見ます。
+  const harnessDimensions = {
+    HarnessId: harness.attrArn,
+    Name: `harness_${harness.harnessName}::DEFAULT`,
+    Operation: 'InvokeAgentRuntime',
+    EndpointQualifier: 'DEFAULT',
+  };
   // Policy のメトリクスは、CDK の部品のメソッドが文書と違う名前と次元で作るため、文書の名前と次元で作ります。
   const policy = { OperationName: 'AuthorizeAction', PolicyEngine: policyEngine.policyEngineId };
   const guardrail = { GuardrailArn: props.guardrail.attrGuardrailArn, GuardrailVersion: props.guardrailVersion.attrVersion };
-  const sum = { statistic: MetricStatistic.SUM };
 
-  // チャットのAPI・AgentCore・Guardrail・BFF の Harness の呼び出しです。メトリクスを渡して監視します。
-  // チャットのAPIは、ライブラリの API Gateway の監視が CDK の RestApi の型を受け取れない（exactOptionalPropertyTypes）ため、ここで監視します。
+  // チャットのAPIは、ライブラリの API Gateway の監視が CDK の RestApi の型を受け取れない（exactOptionalPropertyTypes）ため、メトリクスを渡して監視します。
   monitoring.monitorCustom({
     alarmFriendlyName: 'Ai',
     metricGroups: [
       {
-        title: 'チャットのAPI',
-        metrics: [{ alarmFriendlyName: 'ChatApi5XXError', metric: props.api.metricServerError(sum), addAlarm: atLeast(5) }],
+        title: '入口：画面のチャット',
+        metrics: [
+          { alarmFriendlyName: 'ChatApi5XXError', metric: props.api.metricServerError(sum), addAlarm: atLeast(5) },
+          {
+            alarmFriendlyName: 'HarnessSystemErrors',
+            metric: metrics.createMetric('SystemErrors', MetricStatistic.SUM, 'Harness SystemErrors', harnessDimensions, undefined, 'AWS/Bedrock-AgentCore'),
+            addAlarm: atLeast(5),
+          },
+        ],
       },
       {
-        title: 'Gateway',
+        title: '入口：外部の MCP クライアント（Gateway）',
         metrics: [
           { alarmFriendlyName: 'GatewaySystemErrors', metric: gateway.metricSystemErrors(sum), addAlarm: atLeast(5) },
           { alarmFriendlyName: 'GatewayThrottles', metric: gateway.metricThrottles(sum), addAlarm: atLeast(5) },
         ],
       },
       {
-        title: '業務MCPサーバー',
+        title: '部品と設定：業務MCPサーバー・Policy',
         metrics: [
           { alarmFriendlyName: 'McpServerSystemErrors', metric: runtime.metricSystemErrors(sum), addAlarm: atLeast(5) },
           { alarmFriendlyName: 'McpServerThrottles', metric: runtime.metricThrottles(sum), addAlarm: atLeast(5) },
-        ],
-      },
-      {
-        title: 'Policy',
-        metrics: [
           {
             alarmFriendlyName: 'PolicyMismatchErrors',
             metric: metrics.createMetric('MismatchErrors', MetricStatistic.SUM, 'MismatchErrors', policy, undefined, 'AWS/Bedrock-AgentCore'),
             addAlarm: atLeast(1),
           },
+        ],
+      },
+      {
+        title: 'セキュリティの兆候：Policy の拒否・Guardrail の介入',
+        metrics: [
           {
             alarmFriendlyName: 'PolicyDenyDecisions',
             metric: metrics.createMetric('DenyDecisions', MetricStatistic.SUM, 'DenyDecisions', policy, undefined, 'AWS/Bedrock-AgentCore'),
             addAlarm: atLeast(20),
           },
-        ],
-      },
-      {
-        title: 'Guardrail と Harness',
-        metrics: [
           {
             alarmFriendlyName: 'GuardrailIntervened',
             metric: metrics.createMetric('InvocationsIntervened', MetricStatistic.SUM, 'InvocationsIntervened', guardrail, undefined, 'AWS/Bedrock/Guardrails'),
             addAlarm: atLeast(5),
           },
-          { alarmFriendlyName: 'ChatHarnessErrors', metric: harnessErrors, addAlarm: atLeast(5) },
         ],
       },
     ],

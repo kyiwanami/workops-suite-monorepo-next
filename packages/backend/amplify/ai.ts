@@ -271,6 +271,7 @@ export function createAiBackend(props: {
     policyEngine,
     api: chat.api,
     chatFunction: props.chatFunction,
+    harness: chat.harness,
     guardrail: chat.guardrail,
     guardrailVersion: chat.guardrailVersion,
   });
