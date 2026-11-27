@@ -194,8 +194,11 @@ export const requestIdSchema = z.object({
   requestId: z.uuid().meta({ title: '申請', description: '申請のID' }),
 });
 
-// 申請の編集の入力です。対象の申請と、変更後の内容です。
-export const requestUpdateSchema = requestSchema.extend(requestIdSchema.shape);
+// 申請の編集で変える内容です。渡した項目だけを変えます。
+export const requestChangesSchema = requestSchema.partial();
+
+// 申請の編集の入力です。対象の申請と、変える項目だけです。
+export const requestUpdateSchema = requestChangesSchema.extend(requestIdSchema.shape);
 
 // 申請の却下・差戻しの入力です。対象の申請と、理由です。
 export const requestReasonSchema = reasonSchema.extend(requestIdSchema.shape);
@@ -213,5 +216,6 @@ export type RequestCounts = z.infer<typeof requestCountsSchema>;
 export type RequestStatus = z.infer<typeof requestStatus>;
 export type RequestPeriod = z.infer<typeof requestPeriod>;
 export type RequestDetail = z.infer<typeof requestDetailSchema>;
+export type RequestChanges = z.infer<typeof requestChangesSchema>;
 export type RequestOperations = z.infer<typeof requestOperationsSchema>;
 export type RequestTypeOption = z.infer<typeof requestTypeOptionSchema>;

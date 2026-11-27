@@ -35,7 +35,11 @@ function waitingText(messages: ChatMessage[]) {
   if (part.providerExecuted === true) {
     return `${toolTitle(part)}を確認しています…`;
   }
-  return `${toolTitle(part)}を実行しています…`;
+  // 書込みのツールは、承認されてから実行する。それまでは確認カードを用意している
+  if (part.state === 'approval-responded') {
+    return `${toolTitle(part)}を実行しています…`;
+  }
+  return '確認の内容を用意しています…';
 }
 
 // AIとの1つの会話です。依頼を送り、回答を逐次表示し、書込みのツールは確認カードで確定させます。
@@ -97,7 +101,7 @@ export function Chat({ chat }: { chat: AiChat<ChatMessage> }) {
                           const target = data.find((item) => item.type === 'data-target')?.data;
                           const names = data.find((item) => item.type === 'data-names')?.data;
                           const resultAt = data.find((item) => item.type === 'data-result')?.data.at;
-                          return <ToolPart key={part.toolCallId} part={part} target={target} names={names} resultAt={resultAt} onRespond={addToolApprovalResponse} />;
+                          return <ToolPart key={part.toolCallId} part={part} target={target} names={names} resultAt={resultAt} pending={busy && message === messages.at(-1)} onRespond={addToolApprovalResponse} />;
                         }
                         return null;
                       })}

@@ -87,6 +87,7 @@ export const assetDetailSchema = z.object({
   name: z.string().meta({ description: '資産の名称' }),
   status: assetStatus,
   departmentId: z.string().meta({ description: '部署のID' }),
+  departmentName: z.string().meta({ description: '部署の名前' }),
   assetTypeId: z.string().meta({ description: '資産種別のID' }),
   assetTypeName: z.string().meta({ description: '資産種別の名前' }),
   assigneeSub: z
@@ -111,8 +112,11 @@ export const assetIdSchema = z.object({
   assetId: z.uuid().meta({ title: '資産', description: '資産のID' }),
 });
 
-// 資産の編集の入力です。対象の資産と、変更後の内容です。
-export const assetUpdateSchema = assetSchema.extend(assetIdSchema.shape);
+// 資産の編集で変える内容です。渡した項目だけを変えます。部署は変えません。
+export const assetChangesSchema = assetSchema.omit({ departmentId: true }).partial();
+
+// 資産の編集の入力です。対象の資産と、変える項目だけです。
+export const assetUpdateSchema = assetChangesSchema.extend(assetIdSchema.shape);
 
 // 資産の登録・編集で選べる資産種別の一覧です。
 export const assetTypeOptionsSchema = z.object({ assetTypes: z.array(assetTypeOptionSchema) });
@@ -137,9 +141,18 @@ export const memberSchema = z.object({
 // 資産の担当者に選べる、部署の有効な利用者の一覧です。全体管理者はすべての部署、それ以外は自部署の利用者です。
 export const membersSchema = z.object({ members: z.array(memberSchema) });
 
+// 担当者の候補の検索条件です。
+export const memberConditionsSchema = z.object({
+  q: z
+    .string()
+    .nullable()
+    .meta({ description: '利用者の名前・メールの部分一致。すべての候補なら null' }),
+});
+
 // 資産の一覧・詳細・選択肢・状態・担当者の候補の型です。
 export type AssetList = z.infer<typeof assetListSchema>;
 export type AssetDetail = z.infer<typeof assetDetailSchema>;
+export type AssetChanges = z.infer<typeof assetChangesSchema>;
 export type AssetTypeOption = z.infer<typeof assetTypeOptionSchema>;
 export type AssetItem = z.infer<typeof assetItemSchema>;
 export type AssetStatus = z.infer<typeof assetStatus>;

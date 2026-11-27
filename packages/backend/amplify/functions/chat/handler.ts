@@ -1,14 +1,15 @@
 import { env } from '$amplify/env/chat';
 import { type Event, UnauthorizedException } from '@aws-sdk/client-bedrock-agentcore';
 import { ApplyGuardrailCommand, BedrockRuntimeClient } from '@aws-sdk/client-bedrock-runtime';
+import { CognitoIdentityProviderClient } from '@aws-sdk/client-cognito-identity-provider';
 import type { MCPClient } from '@ai-sdk/mcp';
 import { streamHandle } from '@hono/aws-lambda';
 import { isSpecType } from '@modelcontextprotocol/client';
 import { listAppUrls } from '@workops/domain/apps';
 import { createDatabase } from '@workops/domain/database';
+import { getMembership } from '@workops/domain/membership';
 import { closeToolRequests, listToolApprovals, recordToolDecisions, recordToolRequests, recordToolResult } from '@workops/domain/tool-approvals';
 import { chatSchema, dataPartSchemas } from '@workops/schema/chat';
-import { nameTools, writeTools } from '@workops/schema/tools';
 import {
   convertToModelMessages,
   createUIMessageStream,
@@ -19,7 +20,6 @@ import {
   safeValidateUIMessages,
   streamText,
   toUIMessageStream,
-  type JSONValue,
   type ToolSet,
   type TypedToolCall,
   type UIMessageStreamWriter,
@@ -28,11 +28,13 @@ import type { APIGatewayProxyWithCognitoAuthorizerEvent } from 'aws-lambda';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { validator } from 'hono/validator';
-import { connectGateway, exchangeToken, gatewayPrefix, listGatewayTools } from './gateway';
+import { connectGateway, exchangeToken, listGatewayTools } from './gateway';
+import { readNames, readTarget } from './cards';
 import { createHarnessModel } from './harness';
 import { type ChatMessage, listConversations, listEvents, pendingToolUses, sessionId, toMessages, toUIMessages } from './memory';
 
 const bedrock = new BedrockRuntimeClient({ region: env.AWS_REGION });
+const cognito = new CognitoIdentityProviderClient({ region: env.AWS_REGION });
 const db = createDatabase({
   region: env.AWS_REGION,
   database: env.DATABASE_NAME,
@@ -276,73 +278,24 @@ async function prepare(userToken: string) {
   }
 }
 
-// 確認カードの対象の今の値を、利用者として読み取りのツールで取る
-async function readTarget(gateway: MCPClient, toolCall: TypedToolCall<ToolSet>) {
-  const target = writeTools.get(toolCall.toolName)?.target ?? null;
-  // 新規作成は対象なし
-  if (target === null) {
-    return null;
-  }
-  const args = target.input.safeParse(toolCall.input);
-  // 入力に対象の ID がない
-  if (!args.success) {
-    return null;
-  }
-  // 対象の値の形でなければ null
-  const value = dataPartSchemas.target.safeParse((await callTool(gateway, target.tool, args.data))?.structuredContent);
-  return value.success ? value.data : null;
-}
-
-// 確認カードの入力の ID の項目の名前を、利用者として読み取りのツールで引く
-async function readNames(gateway: MCPClient, toolCall: TypedToolCall<ToolSet>) {
-  const input = writeTools.get(toolCall.toolName)?.input.safeParse(toolCall.input);
-  // 表にないツール、入力がスキーマに合わない
-  if (input === undefined || !input.success) {
-    return null;
-  }
-  const names = new Map<string, string>();
-  for (const [field, id] of Object.entries(input.data)) {
-    const nameTool = nameTools.get(field);
-    // 名前を引かない項目、ID が未設定
-    if (nameTool === undefined || typeof id !== 'string') {
-      continue;
-    }
-    const options = nameTool.value.safeParse((await callTool(gateway, nameTool.tool, {}))?.structuredContent);
-    const name = options.success ? options.data.find((option) => option.id === id)?.name : undefined;
-    // 利用者に見えない・存在しない ID は除く
-    if (name !== undefined) {
-      names.set(field, name);
-    }
-  }
-  return names.size === 0 ? null : Object.fromEntries(names);
-}
-
-// 利用者として Gateway の読み取りのツールを呼ぶ。失敗は null（カードは値なしで出す）
-async function callTool(gateway: MCPClient, tool: string, args: Record<string, JSONValue>) {
-  // 届かなかった
-  const result = await gateway.callTool({ name: `${gatewayPrefix}${tool}`, arguments: args }).catch((error) => {
-    console.error(error);
-    return null;
-  });
-  // 権限なし・見つからない
-  if (result === null || result.isError === true) {
-    return null;
-  }
-  return result;
-}
-
 // 確認カードを対象の値・名前と一緒に記録し、カードに添える
+// 対象の値と名前は、画面と業務MCPサーバーと同じ業務の処理で、利用者の所属で読む
 async function recordCards(input: {
   sub: string;
   conversationId: string;
-  gateway: MCPClient;
   writer: UIMessageStreamWriter<ChatMessage>;
   toolCalls: Array<TypedToolCall<ToolSet>>;
 }) {
-  const { sub, conversationId, gateway, writer } = input;
+  const { sub, conversationId, writer } = input;
   const now = new Date().toISOString();
+  const member = await getMembership(db, sub);
+  const context = member === null ? null : { db, cognito, userPoolId: env.USER_POOL_ID, member };
   const cards = await Promise.all(
-    input.toolCalls.map(async (toolCall) => ({ toolCall, target: await readTarget(gateway, toolCall), names: await readNames(gateway, toolCall) })),
+    input.toolCalls.map(async (toolCall) => {
+      const target = context === null ? null : await readTarget(context, toolCall.toolName, toolCall.input);
+      const names = context === null ? null : await readNames(context, toolCall.toolName, toolCall.input, target);
+      return { toolCall, target, names };
+    }),
   );
   await recordToolRequests(
     db,
@@ -407,7 +360,7 @@ async function converse(input: {
         toolApproval: ({ toolCall }) => (readTools.includes(toolCall.toolName) ? 'not-applicable' : 'user-approval'),
         // 承認を求めた呼び出しの確認カードを記録する
         onStepEnd: ({ content }) =>
-          recordCards({ sub, conversationId, gateway, writer, toolCalls: content.flatMap((part) => (part.type === 'tool-approval-request' ? [part.toolCall] : [])) }),
+          recordCards({ sub, conversationId, writer, toolCalls: content.flatMap((part) => (part.type === 'tool-approval-request' ? [part.toolCall] : [])) }),
         // 実行の結果を記録し、日時をカードに添える。ツールが失敗を返したら failed
         onToolExecutionEnd: async ({ toolCall, toolOutput }) => {
           const failed = toolOutput.type === 'tool-error' || (isSpecType.CallToolResult(toolOutput.output) && toolOutput.output.isError === true);

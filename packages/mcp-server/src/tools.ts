@@ -27,6 +27,7 @@ import {
   assetListSchema,
   assetTypeOptionsSchema,
   departmentOptionsSchema,
+  memberConditionsSchema,
   membersSchema,
 } from '@workops/schema/assets';
 import {
@@ -93,7 +94,7 @@ export function createServer() {
     'get-asset',
     {
       title: '資産の詳細',
-      description: '資産の詳細を取得します。全体管理者以外は自部署の資産だけを取得できます。',
+      description: '資産の詳細を、部署名・種別名・担当者の名前と一緒に取得します。全体管理者以外は自部署の資産だけを取得できます。',
       inputSchema: assetIdSchema,
       outputSchema: assetDetailSchema,
       annotations: read,
@@ -127,11 +128,12 @@ export function createServer() {
     'list-members',
     {
       title: '担当者の候補の一覧',
-      description: '資産の担当者に選べる、部署の有効な利用者を取得します。全体管理者はすべての部署、それ以外は自部署の利用者です。',
+      description: '資産の担当者に選べる、部署の有効な利用者を、名前・メールで検索します。全体管理者はすべての部署、それ以外は自部署の利用者です。依頼に出てきた人の名前で検索し、結果の sub を担当者に指定します。',
+      inputSchema: memberConditionsSchema,
       outputSchema: membersSchema,
       annotations: read,
     },
-    (ctx) => run(ctx, async (context) => ({ members: await listMembers(context, null) })),
+    (args, ctx) => run(ctx, async (context) => ({ members: await listMembers(context, null, args.q) })),
   );
 
   server.registerTool(
@@ -150,7 +152,7 @@ export function createServer() {
     'update-asset',
     {
       title: '資産の編集',
-      description: '資産の内容を更新します。担当者以上が使えます。資産の担当者は、部署の有効な利用者から選びます。',
+      description: '資産の名称・種別・状態・担当者のうち、変える項目だけを渡して更新します。変えない項目は渡しません。担当者以上が使えます。担当者は list-members で探した、資産の部署の有効な利用者の sub を渡し、未割当にするときは null を渡します。',
       inputSchema: writeToolCards['update-asset'].input,
       outputSchema: assetIdSchema,
       annotations: change,
@@ -198,7 +200,7 @@ export function createServer() {
     'get-request',
     {
       title: '申請の詳細',
-      description: '申請の詳細と、利用者がその申請に対してできる操作を取得します。全体管理者以外は自部署の申請だけを取得できます。',
+      description: '申請の詳細と、利用者がその申請に対してできる操作を取得します。全体管理者以外は自部署の申請だけを取得できます。申請を操作する前に、できる操作を確かめます。',
       inputSchema: requestIdSchema,
       outputSchema: requestWithOperationsSchema,
       annotations: read,
@@ -238,7 +240,7 @@ export function createServer() {
     'update-request',
     {
       title: '申請の編集',
-      description: '申請の内容を更新します。担当者以上が、自分の下書きの申請に対して使えます。',
+      description: '申請の件名・説明・種別・金額のうち、変える項目だけを渡して更新します。変えない項目は渡しません。担当者以上が、自分の下書きの申請に対して使えます。',
       inputSchema: writeToolCards['update-request'].input,
       outputSchema: requestIdSchema,
       annotations: change,

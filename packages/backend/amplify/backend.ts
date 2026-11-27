@@ -80,9 +80,12 @@ for (const [name, value] of Object.entries({
   DATABASE_NAME: database.databaseName,
   SECRET_ARN: database.secretArn,
   CLUSTER_ARN: database.cluster.clusterArn,
+  USER_POOL_ID: userPool.userPoolId,
 })) {
   app.chat.addEnvironment(name, value);
 }
+// 確認カードに担当者・申請者の名前を出すため、ユーザープールの利用者を読みます。
+userPool.grant(app.chat.resources.lambda, 'cognito-idp:ListUsers');
 
 // 各アプリがクライアントを作るときと、サーバー側の処理で読む値です。
 app.addOutput({

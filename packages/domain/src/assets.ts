@@ -1,11 +1,11 @@
 import { asset, assetType, department, userMembership } from '@workops/blocks/schema';
-import { and, asc, count, desc, eq, ilike, inArray, or } from 'drizzle-orm';
+import { and, asc, count, desc, eq, exists, ilike, inArray, or } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Context } from './context';
 import { BusinessError, notFoundError, roleError } from './errors';
 import { hasRole, type Membership } from './membership';
-import { getUserName, listUsers } from './users';
-import type { AssetConditions, AssetDetail, AssetList, assetSchema, AssetStatus, AssetTypeOption } from '@workops/schema/assets';
+import { getUser, listUsers } from './users';
+import type { AssetChanges, AssetConditions, AssetDetail, AssetList, assetSchema, AssetTypeOption } from '@workops/schema/assets';
 
 // 一覧の1ページの件数です。
 const pageSize = 20;
@@ -23,7 +23,8 @@ export async function listAssetTypeOptions(context: Context): Promise<AssetTypeO
 
 // 部署に所属する有効な利用者です。担当者の選択肢に使います。名前の順で返します。
 // 部署を指定しないときは、全体管理者はすべての部署、それ以外は自部署の利用者です。扱えない部署を指定したときは空です。
-export async function listMembers(context: Context, departmentId: string | null) {
+// 検索語があれば、名前・メールの部分一致で絞り込みます。
+export async function listMembers(context: Context, departmentId: string | null, q: string | null) {
   const { db, member } = context;
   const [users, memberships] = await Promise.all([
     listUsers(context),
@@ -37,7 +38,12 @@ export async function listMembers(context: Context, departmentId: string | null)
         ),
       ),
   ]);
-  const usersBySub = new Map(users.filter((user) => user.enabled).map((user) => [user.sub, user]));
+  const keyword = q?.toLowerCase();
+  const usersBySub = new Map(
+    users
+      .filter((user) => user.enabled && (keyword === undefined || user.name.toLowerCase().includes(keyword) || user.email.toLowerCase().includes(keyword)))
+      .map((user) => [user.sub, user]),
+  );
   return memberships
     .flatMap((membership) => {
       const user = usersBySub.get(membership.sub);
@@ -96,7 +102,7 @@ export async function listAssets(context: Context, conditions: AssetConditions):
   };
 }
 
-// 資産の詳細です。扱える部署の資産でなければ null を返します。種別名と担当者の名前を一緒に返します。
+// 資産の詳細です。扱える部署の資産でなければ null を返します。部署名・種別名・担当者の名前を一緒に返します。
 export async function getAsset(context: Context, id: string): Promise<AssetDetail | null> {
   if (!z.uuid().safeParse(id).success) {
     return null;
@@ -105,6 +111,7 @@ export async function getAsset(context: Context, id: string): Promise<AssetDetai
     .select({
       id: asset.id,
       departmentId: asset.departmentId,
+      departmentName: department.name,
       name: asset.name,
       assetTypeId: asset.assetTypeId,
       assetTypeName: assetType.name,
@@ -114,34 +121,54 @@ export async function getAsset(context: Context, id: string): Promise<AssetDetai
     })
     .from(asset)
     .innerJoin(assetType, eq(assetType.id, asset.assetTypeId))
+    .innerJoin(department, eq(department.id, asset.departmentId))
     .where(and(eq(asset.id, id), departmentScope(context.member)));
   const row = rows.at(0);
   if (row === undefined) {
     return null;
   }
-  return { ...row, assigneeName: row.assigneeSub === null ? null : await getUserName(context, row.assigneeSub) };
+  const assignee = row.assigneeSub === null ? null : await getUser(context, row.assigneeSub);
+  return { ...row, assigneeName: assignee?.name ?? null };
 }
 
-// 担当者が、部署の有効な利用者か未割当であることを確かめます。
-async function checkAssignee(context: Context, departmentId: string, assigneeSub: string | null) {
-  if (assigneeSub === null) {
-    return;
-  }
-  const members = await listMembers(context, departmentId);
-  if (!members.some((member) => member.sub === assigneeSub)) {
-    throw new BusinessError('担当者は、部署の有効な利用者から選んでください。');
+// 担当者の決まり（資産-05）に合わないときのエラーです。
+const assigneeError = () => new BusinessError('担当者は、資産の部署の有効な利用者から選んでください。');
+
+// 担当者が有効な利用者であることを確かめます。有効区分は Cognito にあります。
+async function checkEnabled(context: Context, sub: string) {
+  const user = await getUser(context, sub);
+  if (user === null || !user.enabled) {
+    throw assigneeError();
   }
 }
+
+// 担当者が、更新する資産の部署に所属していることの条件です。
+const belongsToAssetDepartment = (context: Context, sub: string) =>
+  exists(
+    context.db
+      .select({ sub: userMembership.sub })
+      .from(userMembership)
+      .where(and(eq(userMembership.sub, sub), eq(userMembership.departmentId, asset.departmentId))),
+  );
 
 // 資産を登録し、登録した資産の ID を返します。担当者以上が使えます。
-// 全体管理者は選んだ部署、それ以外は自部署に登録します。作成者・更新者は操作する利用者です。
+// 全体管理者は選んだ部署、それ以外は自部署に登録します。担当者は、その部署の有効な利用者か未割当です。作成者・更新者は操作する利用者です。
 export async function createAsset(context: Context, values: z.infer<typeof assetSchema>) {
   const { db, member } = context;
   if (!hasRole(member, 'editor')) {
     throw roleError();
   }
   const departmentId = member.isAdmin ? values.departmentId : member.departmentId;
-  await checkAssignee(context, departmentId, values.assigneeSub);
+  if (values.assigneeSub !== null) {
+    await checkEnabled(context, values.assigneeSub);
+    const memberships = await db
+      .select({ sub: userMembership.sub })
+      .from(userMembership)
+      .where(and(eq(userMembership.sub, values.assigneeSub), eq(userMembership.departmentId, departmentId)));
+    if (memberships.length === 0) {
+      throw assigneeError();
+    }
+  }
   const now = new Date().toISOString();
   const created = await db
     .insert(asset)
@@ -160,57 +187,54 @@ export async function createAsset(context: Context, values: z.infer<typeof asset
   return created[0].id;
 }
 
-// 資産を更新し、資産の ID を返します。部署は変えません。担当者以上が、扱える資産に使えます。
-export async function updateAsset(context: Context, id: string, values: z.infer<typeof assetSchema>) {
+// 資産の渡した項目だけを変え、資産の ID を返します。部署は変えません。担当者以上が、扱える部署の資産に使えます。
+// 担当者を替えるときは、資産の部署の有効な利用者か未割当です。
+export async function updateAsset(context: Context, id: string, values: AssetChanges) {
   const { db, member } = context;
   if (!hasRole(member, 'editor')) {
     throw roleError();
   }
-  const current = await getAsset(context, id);
-  if (current === null) {
-    throw notFoundError();
+  const assigneeSub = values.assigneeSub;
+  if (assigneeSub !== undefined && assigneeSub !== null) {
+    await checkEnabled(context, assigneeSub);
   }
-  await checkAssignee(context, current.departmentId, values.assigneeSub);
-  await db
+  const updated = await db
     .update(asset)
     .set({
       name: values.name,
       assetTypeId: values.assetTypeId,
       status: values.status,
-      assigneeSub: values.assigneeSub,
+      assigneeSub,
       updatedAt: new Date().toISOString(),
       updatedBy: member.sub,
     })
-    .where(eq(asset.id, current.id));
-  return current.id;
+    .where(
+      and(
+        eq(asset.id, id),
+        departmentScope(member),
+        assigneeSub === undefined || assigneeSub === null ? undefined : belongsToAssetDepartment(context, assigneeSub),
+      ),
+    )
+    .returning({ id: asset.id });
+  const row = updated.at(0);
+  if (row === undefined) {
+    throw new BusinessError('資産が見つからないか、担当者が資産の部署の利用者ではありません。');
+  }
+  return row.id;
 }
 
-// 資産の状態を変えます。変える前と後の状態を返します。担当者以上が、扱える資産に使えます。
-export async function changeStatus(context: Context, id: string, status: AssetStatus) {
-  const { db, member } = context;
-  if (!hasRole(member, 'editor')) {
-    throw roleError();
-  }
-  const current = await getAsset(context, id);
-  if (current === null) {
-    throw notFoundError();
-  }
-  await db
-    .update(asset)
-    .set({ status, updatedAt: new Date().toISOString(), updatedBy: member.sub })
-    .where(eq(asset.id, current.id));
-  return { from: current.status, to: status };
-}
-
-// 資産を削除し、資産の ID を返します。承認者以上が、扱える資産に使えます。
+// 資産を削除し、資産の ID を返します。承認者以上が、扱える部署の資産に使えます。
 export async function deleteAsset(context: Context, id: string) {
   if (!hasRole(context.member, 'manager')) {
     throw roleError();
   }
-  const current = await getAsset(context, id);
-  if (current === null) {
+  const deleted = await context.db
+    .delete(asset)
+    .where(and(eq(asset.id, id), departmentScope(context.member)))
+    .returning({ id: asset.id });
+  const row = deleted.at(0);
+  if (row === undefined) {
     throw notFoundError();
   }
-  await context.db.delete(asset).where(eq(asset.id, current.id));
-  return current.id;
+  return row.id;
 }

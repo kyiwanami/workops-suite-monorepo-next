@@ -5,7 +5,7 @@ import { Badge } from '@workops/ui/components/badge';
 import { Button } from '@workops/ui/components/button';
 import { Spinner } from '@workops/ui/components/spinner';
 import { assetStatusBadges, formatAmount, formatDateTime, requestStatusBadges } from '@workops/ui/lib/labels';
-import { writeTools } from '@workops/schema/tools';
+import { fieldTitle, writeTools } from '@workops/schema/tools';
 import type { ChatAddToolApproveResponseFunction, DynamicToolUIPart, JSONValue } from 'ai';
 import { ArrowRightIcon, CircleAlertIcon, CircleCheckIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -49,14 +49,16 @@ function formatValue(name: string, value: JSONValue | undefined): ReactNode {
   return String(value);
 }
 
+// ID の項目かです。
+const isIdField = (name: string) => nameFields.has(name) || name.endsWith('Id');
+
 // 入力の値の表示です。ID の項目は、BFF が引いた名前を出します。名前を引けなかった ID の項目は、変更後の値では「変更します」と書きます。
 function inputValue(name: string, value: JSONValue | undefined, names: Map<string, string>): ReactNode {
   const named = names.get(name);
   if (named !== undefined) {
     return named;
   }
-  const idField = nameFields.has(name) || name.endsWith('Id');
-  if (idField && value !== null) {
+  if (isIdField(name) && value !== null) {
     return '変更します';
   }
   return formatValue(name, value);
@@ -89,8 +91,18 @@ function cardRows(part: DynamicToolUIPart, target: JSONValue | undefined, names:
     return [{ label: '入力', value: JSON.stringify(part.input) }];
   }
   const values = new Map(Object.entries(input.data));
-  const fields = Object.entries(card.input.shape).map(([name, field]) => ({ name, label: field.meta()?.title ?? name }));
-  const inputRows = fields.map(({ name, label }) => ({ label, value: names.get(name) ?? formatValue(name, values.get(name)) }));
+  // 入力に渡された項目です。編集では、変える項目だけが渡されます。
+  const fields = Object.entries(card.input.shape)
+    .filter(([name]) => values.has(name))
+    .map(([name, field]) => ({ name, label: fieldTitle(field) ?? name }));
+  // ID の項目は、名前を引けたものだけを出し、ID そのものは出しません。
+  const inputRows = fields.flatMap(({ name, label }) => {
+    const named = names.get(name);
+    if (named !== undefined) {
+      return [{ label, value: named }];
+    }
+    return isIdField(name) ? [] : [{ label, value: formatValue(name, values.get(name)) }];
+  });
   if (card.target === null) {
     return inputRows;
   }
@@ -117,7 +129,10 @@ function cardRows(part: DynamicToolUIPart, target: JSONValue | undefined, names:
       continue;
     }
     if (!current.has(name)) {
-      rows.push({ label, value: names.get(name) ?? formatValue(name, values.get(name)) });
+      const named = names.get(name);
+      if (named !== undefined || !isIdField(name)) {
+        rows.push({ label, value: named ?? formatValue(name, values.get(name)) });
+      }
       continue;
     }
     if (current.get(name) === values.get(name)) {
@@ -179,20 +194,26 @@ function Outcome({ part, resultAt }: { part: DynamicToolUIPart; resultAt: string
 // 読み取りのツールは、待っている間の表示（会話の下の1行）で示すため、ここでは何も出しません。
 // 書込みのツールは確認カードです。承認を求めている間は確定ボタンを出し、判断のあとは罫線の下に結果と日時を出します。
 // target は BFF が添えた、カードを表示した時点の対象の値、names は入力の ID の項目の名前、resultAt は実行の日時です。
+// pending は回答を受け取っている間かです。対象の値と名前は回答の終わりまでに届くため、確定を求めるカードは受け取り終えてから出します。
 export function ToolPart({
   part,
   target,
   names,
   resultAt,
+  pending,
   onRespond,
 }: {
   part: DynamicToolUIPart;
   target: JSONValue | undefined;
   names: Record<string, string> | undefined;
   resultAt: string | undefined;
+  pending: boolean;
   onRespond: ChatAddToolApproveResponseFunction;
 }) {
   if (part.providerExecuted === true || part.state === 'input-streaming' || part.state === 'input-available') {
+    return null;
+  }
+  if (part.state === 'approval-requested' && pending) {
     return null;
   }
   const card = writeTools.get(part.toolName);

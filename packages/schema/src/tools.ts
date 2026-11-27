@@ -1,13 +1,10 @@
-import type { z } from 'zod';
+import { z } from 'zod';
 import { assetTypeSchema } from './asset-types';
 import {
   assetDetailSchema,
   assetIdSchema,
   assetSchema,
-  assetTypeOptionsSchema,
   assetUpdateSchema,
-  departmentOptionsSchema,
-  membersSchema,
 } from './assets';
 import {
   requestIdSchema,
@@ -15,28 +12,21 @@ import {
   requestSchema,
   requestStatus,
   requestTransitions,
-  requestTypeOptionsSchema,
   requestUpdateSchema,
   requestWithOperationsSchema,
 } from './requests';
 
-// 確認カードの対象を取る読み取りのツールです。書込みのツールの入力から対象のID（input）を取り出して呼び、結果を対象の値（value）として検証します。
-const assetTarget = { tool: 'get-asset', input: assetIdSchema, value: assetDetailSchema };
-const requestTarget = { tool: 'get-request', input: requestIdSchema, value: requestWithOperationsSchema };
+// 確認カードの対象です。書込みのツールの入力から対象の ID（input）を取り出し、対象の今の値を、関連する名前と一緒に（value）カードに添えます。
+const assetTarget = { input: assetIdSchema, value: assetDetailSchema };
+const requestTarget = { input: requestIdSchema, value: requestWithOperationsSchema };
 
-// 書込みのツールの入力の ID の項目から名前を引く、読み取りのツールです。確認カードで ID の代わりに名前を出すのに使います。
-// 項目名から引き、ツールの結果を「ID と名前」の一覧に直して使います。
-export const nameTools = new Map([
-  ['assetTypeId', { tool: 'list-asset-types', value: assetTypeOptionsSchema.transform((value) => value.assetTypes) }],
-  ['requestTypeId', { tool: 'list-request-types', value: requestTypeOptionsSchema.transform((value) => value.requestTypes) }],
-  ['departmentId', { tool: 'list-departments', value: departmentOptionsSchema.transform((value) => value.departments) }],
-  ['assigneeSub', { tool: 'list-members', value: membersSchema.transform((value) => value.members.map((member) => ({ id: member.sub, name: member.name }))) }],
-]);
+// 入力の項目の、画面の項目名です。編集の入力は項目を省略可能に包むため、包んだ中の項目名を使います。
+export const fieldTitle = (field: z.ZodType) => z.globalRegistry.get(field instanceof z.ZodOptional ? field.unwrap() : field)?.title;
 
 // 書込みのツールの、AIの確認カードの内容です。言葉と色は、デザインシステムの「確定ボタンの規則」に従います。
 type WriteTool = {
   // ツールの入力。各項目の title を項目名に使います
-  input: z.ZodObject<Record<string, z.ZodType<z.core.util.JSONType>>>;
+  input: z.ZodObject<Record<string, z.ZodType<z.core.util.JSONType | undefined>>>;
   // 何をするかを「〜します」で書いた見出し
   heading: string;
   // 確定ボタンの操作の動詞
@@ -45,7 +35,7 @@ type WriteTool = {
   destructive: boolean;
   // 操作の結果（元に戻せるか、相手が何をできるか）を伝える1文。なければ null
   note: string | null;
-  // 対象を取る読み取りのツール。対象のない新規作成では null
+  // 確認カードの対象。対象のない新規作成では null
   target: typeof assetTarget | typeof requestTarget | null;
   // 操作のあとの申請の状態。状態を変えない操作では null
   nextStatus: z.infer<typeof requestStatus> | null;

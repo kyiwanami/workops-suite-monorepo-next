@@ -29,14 +29,14 @@ export const requiredAttribute = (attributes: AttributeType[] | undefined, name:
   return value;
 };
 
-// 利用者識別子から、利用者の名前（未設定ならメール）を返します。見つからなければ null を返します。
-export async function getUserName(context: Context, sub: string) {
+// 利用者識別子から、利用者の名前（未設定ならメール）と有効区分を返します。見つからなければ null を返します。
+export async function getUser(context: Context, sub: string) {
   const output = await context.cognito.send(new ListUsersCommand({ UserPoolId: context.userPoolId, Filter: `sub = "${sub}"`, Limit: 1 }));
   const user = output.Users?.at(0);
   if (user === undefined) {
     return null;
   }
-  return attribute(user.Attributes, 'name') ?? requiredAttribute(user.Attributes, 'email');
+  return { name: attribute(user.Attributes, 'name') ?? requiredAttribute(user.Attributes, 'email'), enabled: user.Enabled === true };
 }
 
 // Cognito の利用者を、利用者識別子・名前（未設定ならメール）・メール・有効区分の形で返します。

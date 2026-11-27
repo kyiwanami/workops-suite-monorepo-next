@@ -32,14 +32,15 @@ export function AssetList({
   const [pending, startTransition] = useTransition();
   const [, setParams] = useQueryStates(assetSearchParams, { shallow: false });
   // 状態を保存し、変えた内容を出します。変えられなければ、その旨を同じ場所に出します。
-  const change = (id: string, status: AssetStatus) =>
+  const change = (item: AssetItem, status: AssetStatus) =>
     startTransition(async () => {
       // 前の操作の結果の表示は消す
       void setParams({ done: null });
       setChanged(null);
       setFailed(false);
       try {
-        setChanged(await changeStatusAction(id, status));
+        await changeStatusAction(item.id, status);
+        setChanged({ from: item.status, to: status });
       } catch (error) {
         unstable_rethrow(error);
         console.error(error);
@@ -52,7 +53,7 @@ export function AssetList({
       status={item.status}
       editable={editable}
       disabled={pending}
-      onChange={(status) => change(item.id, status)}
+      onChange={(status) => change(item, status)}
     />
   );
   return (

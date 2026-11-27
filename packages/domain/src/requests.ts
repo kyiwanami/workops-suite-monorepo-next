@@ -1,15 +1,16 @@
 import { auditLog, department, request, requestType } from '@workops/blocks/schema';
-import { and, asc, count, desc, eq, gte, ilike, inArray, lt, ne, or, type SQL } from 'drizzle-orm';
-import type { PgUpdateSetSource } from 'drizzle-orm/pg-core';
+import { and, asc, count, desc, eq, gte, ilike, inArray, lt, ne, or, sql, type SQL } from 'drizzle-orm';
+import { alias, type PgUpdateSetSource } from 'drizzle-orm/pg-core';
 import { z } from 'zod';
 import type { Context } from './context';
-import { BusinessError, notFoundError, roleError } from './errors';
-import { hasRole, type Membership } from './membership';
-import { getUserName, listUsers } from './users';
+import { BusinessError, roleError } from './errors';
+import { hasRole, type Membership, type MemberRole } from './membership';
+import { getUser, listUsers } from './users';
 import type {
   RequestConditions,
   RequestDetail,
   RequestList,
+  RequestChanges,
   RequestOperations,
   requestSchema,
   RequestTypeOption,
@@ -22,7 +23,7 @@ import { requestTransitions } from '@workops/schema/requests';
 const pageSize = 20;
 
 // 申請の今の状態やロールでは操作できないときのエラーです。
-const operationError = () => new BusinessError('申請の今の状態では、この操作はできません。');
+const operationError = () => new BusinessError('申請が見つからないか、今の状態ではこの操作はできません。申請の詳細で、できる操作を確かめてください。');
 
 // 利用者が扱える申請の条件です。全体管理者はすべての部署、それ以外は自部署の申請だけを扱えます。
 const departmentScope = (member: Membership) => (member.isAdmin ? undefined : eq(request.departmentId, member.departmentId));
@@ -86,14 +87,15 @@ export async function listRequests(context: Context, conditions: RequestConditio
     approve: and(eq(request.status, 'submitted'), ne(request.requesterSub, member.sub)),
     mine: eq(request.requesterSub, member.sub),
   };
-  // 条件に合う申請の件数です。
-  const total = async (where: SQL | undefined) => (await db.select({ total: count() }).from(request).where(where))[0].total;
+  // タブの条件に合う申請の件数です。
+  const countWhere = (condition: SQL | undefined) => sql`count(*) filter (where ${condition})`.mapWith(Number);
   // 1 より前のページは1ページ目として扱う
   const start = (Math.max(conditions.page, 1) - 1) * pageSize;
-  const [all, approve, mine, rows] = await Promise.all([
-    total(filters),
-    canApprove ? total(and(filters, tabConditions.approve)) : 0,
-    total(and(filters, tabConditions.mine)),
+  const [[totals], rows] = await Promise.all([
+    db
+      .select({ all: count(), approve: countWhere(tabConditions.approve), mine: countWhere(tabConditions.mine) })
+      .from(request)
+      .where(filters),
     db
       .select({
         id: request.id,
@@ -113,7 +115,8 @@ export async function listRequests(context: Context, conditions: RequestConditio
       .limit(pageSize)
       .offset(start),
   ]);
-  const counts = { all, approve, mine };
+  // 承認のタブを使えない利用者には、承認するものを数えない
+  const counts = { all: totals.all, approve: canApprove ? totals.approve : 0, mine: totals.mine };
   return {
     tab,
     canApprove,
@@ -157,22 +160,42 @@ export async function getRequest(context: Context, id: string): Promise<RequestD
   if (row === undefined) {
     return null;
   }
-  return { ...row, requesterName: await getUserName(context, row.requesterSub) };
+  const requester = await getUser(context, row.requesterSub);
+  return { ...row, requesterName: requester?.name ?? null };
 }
 
-// 利用者が申請にできる操作です。状態遷移表・ロール・本人条件で決まり、全体管理者にも本人条件と自己承認の禁止を適用します。
+// 申請の操作の決まりです。必要なロール（なければ null）、本人の申請だけか（false は他者の申請だけ）、操作できる今の状態です。
+// 画面のボタンの出し分けと、操作の実行の条件の両方に使います。全体管理者にも、本人の条件と自己承認の禁止を適用します。
+const operationRules: Record<keyof RequestOperations, { role: MemberRole | null; own: boolean; from: RequestStatus[] }> = {
+  update: { role: 'editor', own: true, from: ['draft'] },
+  submit: { role: 'editor', own: true, from: ['draft'] },
+  withdraw: { role: 'editor', own: true, from: ['draft', 'submitted'] },
+  delete: { role: null, own: true, from: ['draft'] },
+  approve: { role: 'manager', own: false, from: ['submitted'] },
+  reject: { role: 'manager', own: false, from: ['submitted'] },
+  return: { role: 'manager', own: false, from: ['submitted'] },
+};
+
+// 利用者のロールで、その操作をできるかです。
+const hasRuleRole = (member: Membership, operation: keyof RequestOperations) => {
+  const { role } = operationRules[operation];
+  return role === null || hasRole(member, role);
+};
+
+// 利用者が申請にできる操作です。操作の決まりの、ロール・本人の条件・今の状態で決まります。
 export function getOperations(member: Membership, target: { requesterSub: string; status: RequestStatus }): RequestOperations {
-  const own = target.requesterSub === member.sub;
-  const editor = hasRole(member, 'editor');
-  const approver = hasRole(member, 'manager') && !own && target.status === 'submitted';
+  const allowed = (operation: keyof RequestOperations) => {
+    const rule = operationRules[operation];
+    return hasRuleRole(member, operation) && (target.requesterSub === member.sub) === rule.own && rule.from.includes(target.status);
+  };
   return {
-    update: editor && own && target.status === 'draft',
-    submit: editor && own && target.status === 'draft',
-    withdraw: editor && own && (target.status === 'draft' || target.status === 'submitted'),
-    delete: own && target.status === 'draft',
-    approve: approver,
-    reject: approver,
-    return: approver,
+    update: allowed('update'),
+    submit: allowed('submit'),
+    withdraw: allowed('withdraw'),
+    delete: allowed('delete'),
+    approve: allowed('approve'),
+    reject: allowed('reject'),
+    return: allowed('return'),
   };
 }
 
@@ -188,8 +211,11 @@ async function checkRequestType(context: Context, id: string) {
   }
 }
 
-// 申請を操作し、監査ログを同じトランザクションで追記して、申請の ID を返します。扱える申請に使えます。
-// 操作の可否を確かめ、今の状態のままの申請だけを、操作の遷移先の状態に変えます。遷移先が null のときは、申請を削除します。
+// 操作する前の申請です。操作の文の中で、変える前の状態を監査ログのために読みます。
+const previous = alias(request, 'previous');
+
+// 申請を操作し、監査ログを同じトランザクションで追記して、申請の ID を返します。
+// 扱える部署の申請のうち、操作の決まり（本人の条件・今の状態）に合うものだけを、操作の遷移先の状態に変えます。遷移先が null のときは、申請を削除します。
 async function operate(
   context: Context,
   id: string,
@@ -198,48 +224,47 @@ async function operate(
   reason: string | null,
 ) {
   const { db, member } = context;
-  const current = await getRequest(context, id);
-  if (current === null) {
-    throw notFoundError();
-  }
-  const newStatus = requestTransitions[operation];
-  if (!getOperations(member, current)[operation]) {
+  if (!hasRuleRole(member, operation)) {
     throw operationError();
   }
+  const rule = operationRules[operation];
+  const newStatus = requestTransitions[operation];
+  const target = and(
+    eq(request.id, id),
+    departmentScope(member),
+    inArray(request.status, rule.from),
+    rule.own ? eq(request.requesterSub, member.sub) : ne(request.requesterSub, member.sub),
+  );
   const now = new Date().toISOString();
-  const target = and(eq(request.id, current.id), eq(request.status, current.status));
-  await db.transaction(async (tx) => {
+  return db.transaction(async (tx) => {
     const changed =
       newStatus === null
-        ? await tx.delete(request).where(target).returning({ id: request.id })
+        ? await tx.delete(request).where(target).returning({ id: request.id, previousStatus: request.status })
         : await tx
             .update(request)
             .set({ ...values(now), status: newStatus, updatedAt: now, updatedBy: member.sub })
-            .where(target)
-            .returning({ id: request.id });
-    if (changed.length === 0) {
+            .from(previous)
+            .where(and(eq(previous.id, request.id), target))
+            .returning({ id: request.id, previousStatus: previous.status });
+    const row = changed.at(0);
+    if (row === undefined) {
       throw operationError();
     }
     await tx.insert(auditLog).values({
-      requestId: current.id,
+      requestId: row.id,
       action: operation,
-      previousStatus: current.status,
+      previousStatus: row.previousStatus,
       newStatus,
       reason,
       createdAt: now,
       createdBy: member.sub,
     });
+    return row.id;
   });
-  return current.id;
 }
 
-// 申請の保存する値です。説明は空なら未設定にします。
-const columns = (values: z.infer<typeof requestSchema>) => ({
-  requestTypeId: values.requestTypeId,
-  title: values.title,
-  description: values.description || null,
-  amount: values.amount,
-});
+// 説明は空なら未設定にします。
+const description = (value: string | null) => (value === '' ? null : value);
 
 // 申請を下書きで作成し、作った申請の ID を返します。部署は申請者の所属部署です。
 export async function createRequest(context: Context, values: z.infer<typeof requestSchema>) {
@@ -253,7 +278,10 @@ export async function createRequest(context: Context, values: z.infer<typeof req
     const created = await tx
       .insert(request)
       .values({
-        ...columns(values),
+        requestTypeId: values.requestTypeId,
+        title: values.title,
+        description: description(values.description),
+        amount: values.amount,
         departmentId: member.departmentId,
         requesterSub: member.sub,
         status: 'draft',
@@ -271,10 +299,23 @@ export async function createRequest(context: Context, values: z.infer<typeof req
   });
 }
 
-// 本人の下書きを編集します。
-export async function updateRequest(context: Context, id: string, values: z.infer<typeof requestSchema>) {
-  await checkRequestType(context, values.requestTypeId);
-  return operate(context, id, 'update', () => columns(values), null);
+// 本人の下書きの、渡した項目だけを編集します。
+export async function updateRequest(context: Context, id: string, values: RequestChanges) {
+  if (values.requestTypeId !== undefined) {
+    await checkRequestType(context, values.requestTypeId);
+  }
+  return operate(
+    context,
+    id,
+    'update',
+    () => ({
+      requestTypeId: values.requestTypeId,
+      title: values.title,
+      description: values.description === undefined ? undefined : description(values.description),
+      amount: values.amount,
+    }),
+    null,
+  );
 }
 
 // 本人の下書きを提出します。

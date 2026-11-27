@@ -32,7 +32,7 @@ export async function exchangeToken(userToken: string) {
 
 // Gateway のツールの公開名の接頭辞です。Gateway は、ターゲット名と「___」をツール名の前に付けます。
 // 書込みのツールは、Gateway のツールと名前が重ならないように、接頭辞を外した名前で Harness に渡します。
-export const gatewayPrefix = 'workops___';
+const gatewayPrefix = 'workops___';
 
 // 交換したトークンで、利用者として Gateway に接続した MCP のクライアントを返します。呼び出し元が使い終わったら閉じます。
 // Gateway は MCP の初期化（initialize）で接続するため、プロトコルの版の問い合わせをしません。

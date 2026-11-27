@@ -4,7 +4,7 @@ import { BusinessError } from '@workops/domain/errors';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
-import { changeStatus, createAsset, deleteAsset, updateAsset } from './data';
+import { createAsset, deleteAsset, updateAsset } from './data';
 import { assetSchema, assetStatus } from '@workops/schema/assets';
 import { serializeAssetSearchParams } from '@/features/assets/search-params';
 
@@ -39,11 +39,10 @@ export async function updateAssetAction(id: string, input: z.infer<typeof assetS
   redirect(savedUrl);
 }
 
-// 資産の状態を変え、一覧を最新にします。変える前と後の状態を返します。
+// 資産の状態だけを変え、一覧を最新にします。
 export async function changeStatusAction(id: string, status: z.infer<typeof assetStatus>) {
-  const changed = await changeStatus(z.uuid().parse(id), assetStatus.parse(status));
+  await updateAsset(z.uuid().parse(id), { status: assetStatus.parse(status) });
   revalidatePath('/assets');
-  return changed;
 }
 
 // 資産を削除し、削除した旨を出す一覧へ戻ります。業務のルールで削除できなければ、その文言を返します。
