@@ -50,6 +50,8 @@ const messages = {
   blocked: 'この依頼には対応できません。依頼の内容を見直してください。',
   conflict: '確認待ちの操作が見つからないか、すでに判断済みか、期限が切れています。',
   failed: '回答を作れませんでした。時間をおいて、もう一度お試しください。',
+  denied: '利用者がキャンセルしたため、実行していません。',
+  abandoned: '利用者が判断せずに次の依頼をしたため、実行していません。',
 };
 
 // 構造化ログです。会話の本文とトークンは出しません。
@@ -156,7 +158,7 @@ async function acceptRequest({ sub, conversationId, userToken, message }: ChatRe
       toolName: toolUse.name,
       input: toolUse.input,
       state: 'output-denied',
-      approval: { id: toolUse.toolUseId, approved: false },
+      approval: { id: toolUse.toolUseId, approved: false, reason: messages.abandoned },
     })),
   };
   return converse({ sub, conversationId, ...prepared, message, prompts: [abandoned, message] });
@@ -223,7 +225,8 @@ async function acceptDecisions({ sub, conversationId, userToken, message }: Chat
       toolName: toolUse.name,
       input: toolUse.input,
       state: 'approval-responded',
-      approval,
+      // やめた理由は BFF で決める（画面から来た文は Guardrail を通っていない）
+      approval: approval.approved ? { id: approval.id, approved: true } : { id: approval.id, approved: false, reason: messages.denied },
     })),
   };
   return converse({ sub, conversationId, ...prepared, message, prompts: [prompt] });

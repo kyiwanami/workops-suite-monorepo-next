@@ -4,6 +4,7 @@ import {
   type LanguageModelV4FinishReason,
   type LanguageModelV4Prompt,
   type LanguageModelV4StreamPart,
+  type LanguageModelV4ToolResultOutput,
   type LanguageModelV4ToolResultPart,
   type LanguageModelV4Usage,
   UnsupportedFunctionalityError,
@@ -178,17 +179,22 @@ function newMessages(prompt: LanguageModelV4Prompt): HarnessMessage[] {
   return [{ role: HarnessConversationRole.USER, content }];
 }
 
-// AI SDK のツールの結果を、Harness のツールの結果にします。Harness はツールの結果を文で受け取ります。
+// AI SDK のツールの結果を、Harness のツールの結果にします。AI SDK の Bedrock のプロバイダー（convertToolResultOutput）と同じ変換です。
 function toolResult({ toolCallId, output }: LanguageModelV4ToolResultPart): HarnessToolResultBlock {
-  // やめた書込みは、実行していないことを失敗として渡す
-  if (output.type === 'execution-denied') {
-    return { toolUseId: toolCallId, status: HarnessToolUseStatus.ERROR, content: [{ text: JSON.stringify(output) }] };
+  return { toolUseId: toolCallId, content: [{ text: toolResultText(output) }] };
+}
+
+function toolResultText(output: LanguageModelV4ToolResultOutput) {
+  switch (output.type) {
+    case 'text':
+    case 'error-text':
+      return output.value;
+    // やめた書込みは、やめた理由
+    case 'execution-denied':
+      return output.reason ?? 'Tool call execution denied.';
+    default:
+      return JSON.stringify(output.value);
   }
-  // 失敗した結果
-  const isError = output.type === 'error-text' || output.type === 'error-json';
-  // 文はそのまま、それ以外は JSON の文にする
-  const text = output.type === 'text' || output.type === 'error-text' ? output.value : JSON.stringify(output.value);
-  return { toolUseId: toolCallId, status: isError ? HarnessToolUseStatus.ERROR : HarnessToolUseStatus.SUCCESS, content: [{ text }] };
 }
 
 // 内容のかたまりの状態です。AI SDK の Bedrock のプロバイダーの contentBlocks と同じ持ち方に、Harness が実行したツールの結果を足しています。
