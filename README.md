@@ -37,7 +37,7 @@ npm run sandbox -- --profile amazon-connect --once
 DB接続にはBlocksが生成する管理者用Secretを使用します。
 テーブルの作成と変更は、デプロイ中のマイグレーションで実行します。
 
-接続設定は`packages/backend/amplify_outputs.json`に自動生成されます。`auth`にユーザープールIDとリージョン、`custom.authDomain`にドメイン、`custom.database`にDB接続情報が入ります。
+接続設定は`packages/backend/amplify_outputs.json`に自動生成されます。`auth`にユーザープールIDとリージョン、`custom.authDomain`にドメイン、`custom.database`にDB接続情報、`custom.chatApiUrl`にAIチャットのAPIのURLが入ります。
 `clusterArn`、Blocks標準の`secretArn`、`databaseName`を出力し、認証情報の値はSecrets Managerで管理します。
 このファイルは手動編集せず、Git管理から除外します。
 
@@ -135,6 +135,7 @@ npx shadcn@latest add <部品名>
 ```
 
 ヘッダーのアプリの切替は、DBの`App`テーブルの`appId`・`name`・`urlDomain`から作ります。`urlDomain`には、環境ごとのアプリのURLを登録します。
+AIチャットのAPIは、`urlDomain`のオリジンからの要求だけを受け付けます。許可するオリジンは、チャットのLambdaが起動するときに読みます。
 
 ## Hosting
 
@@ -148,4 +149,5 @@ Hostingのアプリは、共有バックエンド・ポータル・資産カタ�
 
 サーバー側の処理は、Compute ロールで共有のAuroraをData API経由で読み書きします。ポータルの Compute ロールは、ユーザー管理で共有のユーザープールのユーザーも操作します。
 
-最初の管理者は手で登録します。共有のユーザープールにユーザーを作り、DBの`Department`に部署を、`UserMembership`にそのユーザーの`sub`と部署、`isAdmin`を`true`にした所属を登録します。
+最初の管理者は手で登録します。共有のユーザープールにユーザーを作り、DBの`Department`に部署を、`UserMembership`にそのユーザーの`sub`と部署、`role`を`manager`、`isAdmin`を`true`にした所属を登録します。DBの`User`には、利用者の同期が登録します。
+あわせて、DBの`App`に、ポータル（`appId`は`portal`）・資産カタログ（`asset`）・申請管理（`request`）の名前と`urlDomain`を登録します。
