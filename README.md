@@ -68,7 +68,7 @@ Cognitoの利用者の作成・属性の変更・有効化・無効化・削除�
 
 ```powershell
 $env:AWS_REGION = 'ap-northeast-1'
-npm run sandbox:portal -- --profile amazon-connect --identifier workops-portal --once
+npm run sandbox:portal -- --profile amazon-connect --once
 ```
 
 接続設定は`packages/backend-portal/amplify_outputs.json`に自動生成され、ポータルは`@workops/backend-portal/outputs`として読みます。
@@ -97,7 +97,7 @@ npm run dev:portal
 
 ```powershell
 $env:AWS_REGION = 'ap-northeast-1'
-npm run sandbox:asset -- --profile amazon-connect --identifier workops-asset --once
+npm run sandbox:asset -- --profile amazon-connect --once
 ```
 
 接続設定は`packages/backend-asset/amplify_outputs.json`に自動生成され、資産カタログは`@workops/backend-asset/outputs`として読みます。
@@ -121,7 +121,7 @@ npm run dev:asset
 ## 申請管理
 
 申請管理のフロントエンドは`apps/request`、申請管理のバックエンドは`packages/backend-request`に配置しています。
-資産カタログと同じ形で、sandboxは`npm run sandbox:request -- --profile amazon-connect --identifier workops-request --once`、開発サーバーは`npm run dev:request`で動かします。
+資産カタログと同じ形で、sandboxは`npm run sandbox:request -- --profile amazon-connect --once`、開発サーバーは`npm run dev:request`で動かします。
 クライアントの戻り先と`apps/request/.env.local`の`AMPLIFY_APP_ORIGIN`は、`http://localhost:3002`です。
 
 ## 共通UI
