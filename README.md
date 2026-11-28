@@ -1,153 +1,115 @@
-# workops-suite-monorepo-next
+# Workops Suite
 
-Amplify Gen 2の共有バックエンドを管理するnpm workspacesのモノレポです。Node.js 24を使用します。
-共有のユーザープールとログイン画面のドメインは`packages/backend/amplify`、BlocksのAurora定義とDBスキーマは`packages/blocks`に配置しています。
-`@workops/backend`はAmplify、`@workops/blocks`はBlocksとDBスキーマ・マイグレーションを管理するワークスペースです。
-`amplify/backend.ts`でユーザープールとマネージドログインのドメインを作り、`@workops/blocks/cdk`を接続して、ユーザープールID・リージョン・ドメイン・DB接続情報を出力します。
-Blocksの構築とDBのCDK設定は`packages/blocks/index.cdk.ts`で管理します。
-DBのBlock定義は`packages/blocks/index.ts`、テーブル定義は`packages/blocks/schema.ts`に置きます。
+ポータル・資産カタログ・申請管理の3つのアプリを、共通のログインと権限で使う業務管理システムです。資産と申請は、画面からも AI への自然言語の依頼からも検索・操作できます。
 
-```powershell
-npm ci
-npm run lint
-npm run typecheck
-```
+## 何をする製品か
 
-DBアクセスにはDrizzle ORM v1を使用します。`schema.ts`がテーブル定義とTypeScriptの型の定義元です。
-テーブル定義を変更したら、`packages/blocks`で次のコマンドを実行します。drizzle-kitが`packages/blocks/migrations`にマイグレーションを生成します。DBには接続しません。
-
-```powershell
-npx drizzle-kit generate --name <変更名>
-```
-
-マイグレーションは1件ごとのフォルダ（`migration.sql`と`snapshot.json`）に生成されます。`schema.ts`とマイグレーションのフォルダをGitで管理し、適用済みのマイグレーションは変更しません。
-未適用のマイグレーションは、共有バックエンドのデプロイ中にカスタムリソースがDrizzleのマイグレーション（Data API経由）で適用します。適用履歴は`drizzle.__drizzle_migrations`に記録されます。
-
-Aurora PostgreSQL 17.11をData API経由で使用します。容量は0～2 ACU、無操作300秒で自動停止します。
-ストレージを暗号化します。sandboxの削除ポリシーはAmplify標準のDeleteを使用します。
-
-サンドボックスはリポジトリルートで実行します。AWSリソースを作成・更新します。
-新規構築・更新ともに次のコマンドでデプロイします。
-
-```powershell
-$env:AWS_REGION = 'ap-northeast-1'
-npm run sandbox -- --profile amazon-connect --once
-```
-
-DB接続にはBlocksが生成する管理者用Secretを使用します。
-テーブルの作成と変更は、デプロイ中のマイグレーションで実行します。
-
-接続設定は`packages/backend/amplify_outputs.json`に自動生成されます。`auth`にユーザープールIDとリージョン、`custom.authDomain`にドメイン、`custom.database`にDB接続情報、`custom.chatApiUrl`にAIチャットのAPIのURLが入ります。
-`clusterArn`、Blocks標準の`secretArn`、`databaseName`を出力し、認証情報の値はSecrets Managerで管理します。
-このファイルは手動編集せず、Git管理から除外します。
-
-### 利用者の同期
-
-Cognitoの利用者の作成・属性の変更・有効化・無効化・削除を、DBの`User`に反映します。操作はアカウントのCloudTrailの証跡が記録し、環境ごとのEventBridgeのルールが同期のLambda（`user-sync`）に渡します。
-
-証跡はアカウントで1つだけ作ります。アプリのスタックでは作りません。ap-northeast-1の書き込みの管理イベントを、S3のバケットに90日残します。
-
-| 資源 | 名前 |
+| アプリ | できること |
 | --- | --- |
-| 証跡 | `management-events` |
-| S3のバケット | `cloudtrail-management-events-<アカウントID>-ap-northeast-1` |
+| ポータル | アプリとページの一覧から各アプリを開きます。全体管理者は、利用者・部署・アプリとページを管理します |
+| 資産カタログ | PC・モニター・携帯電話・ライセンスなどの資産を、部署ごとに登録・検索し、担当者と状態（在庫中・貸出中・修理中・廃棄）を管理します |
+| 申請管理 | 備品購入・機器の貸出・経費精算などの申請を作成・提出し、承認者が承認・却下・差戻しします |
+| AI | 資産カタログと申請管理の画面から、AI に検索や操作を頼めます。同じ操作を MCP サーバーとして公開し、外部の MCP クライアントからも使えます |
 
-新しいアカウントでは、最初のデプロイの前に次の順で作ります。
+操作できる範囲は所属部署とロール（閲覧者・担当者・承認者）で決まります。全体管理者は部署をまたいで管理できます。
 
-1. S3のバケットを作り、パブリックアクセスをすべてブロックし、90日で削除するライフサイクルを付けます。
-2. バケットポリシーで、CloudTrailに`s3:GetBucketAcl`と`AWSLogs/<アカウントID>/`への`s3:PutObject`を許可し（`aws:SourceArn`を証跡に限る）、HTTPS以外の接続を拒否します。
-3. 証跡を作り（単一リージョン、ログファイルの検証あり）、イベントセレクターを管理イベントの書き込みだけにして、ログ記録を始めます。
+![ポータルのホーム](docs/images/portal-home.png)
 
-環境を新しく作ったときは、デプロイのあとに同期のLambdaを引数なし（`{}`）で1度呼び、既存の利用者を取り込みます。
+### 画面
 
-## ポータル
+| アプリ | 画面 | 内容 |
+| --- | --- | --- |
+| 共通 | ログイン | 共通のログイン画面。一度ログインすれば、ほかのアプリもそのまま使えます |
+| 共通 | 所属が未設定 | 部署とロールが設定されていない利用者に、全体管理者による設定が必要なことを伝えます |
+| 共通 | 権限がない・見つからない | 権限のない画面と存在しない画面を、区別せずに案内します |
+| 共通 | AI パネル | 画面右下の「AIに頼む」から開きます |
+| ポータル | ホーム | アプリごとのタイルと、配下のページを並べます。権限のないページは表示しません |
+| ポータル | ユーザー一覧・作成・詳細 | 利用者を検索し、作成・所属の設定・招待メールの再送・無効化・削除をします |
+| ポータル | 部署管理 | 部署を登録・編集します |
+| ポータル | アプリ・ページ管理 | アプリと配下のページを登録・編集します |
+| 資産カタログ | 資産一覧 | 名称・担当者で検索し、状態・種別で絞り込みます。一覧から状態を直接変更できます |
+| 資産カタログ | 資産の詳細・編集 | 資産の内容をその場で編集します。登録も同じ画面です |
+| 資産カタログ | 資産種別管理 | 資産の種別を管理します |
+| 申請管理 | 申請一覧 | 「すべて」「自分が承認するもの」「自分の申請」のタブで、件名・申請者で検索します |
+| 申請管理 | 申請詳細 | 状態とロールに応じた操作（提出・取下げ・承認・却下・差戻し）を表示します |
+| 申請管理 | 申請の作成 | 種別・件名・金額・説明を入力し、下書き保存または提出します |
+| 申請管理 | 申請種別管理 | 申請の種別を管理します |
 
-ポータルのフロントエンドは`apps/portal`、ポータルのバックエンドは`packages/backend-portal`に配置しています。
-ポータルのバックエンドは、共有のユーザープールにポータルのアプリクライアントを作り、マネージドログインのスタイルを割り当てます。
-共有バックエンドの`amplify_outputs.json`を読むため、共有バックエンドのsandboxをデプロイしてから実行します。
+![資産一覧](docs/images/asset-list.png)
 
-```powershell
-$env:AWS_REGION = 'ap-northeast-1'
-npm run sandbox:portal -- --profile amazon-connect --once
-```
+![資産の詳細・編集](docs/images/asset-detail.png)
 
-接続設定は`packages/backend-portal/amplify_outputs.json`に自動生成され、ポータルは`@workops/backend-portal/outputs`として読みます。
-クライアントの戻り先は`http://localhost:3000`です。
+![申請一覧](docs/images/request-list.png)
 
-`apps/portal/.env.local`に、ポータルのオリジンを書きます。
+![申請詳細](docs/images/request-detail.png)
 
-```dotenv
-AMPLIFY_APP_ORIGIN=http://localhost:3000
-```
+AI に書き換えを頼むと、実行の前に、何をどう変えるかを名前で示す確認カードが出ます。
 
-開発サーバーは、DBに接続するプロファイルを指定して起動します。
+![AI の確認カード](docs/images/ai-approval-card.png)
 
-```powershell
-$env:AWS_PROFILE = 'amazon-connect'
-npm run dev:portal
-```
+## なぜ役に立つか
 
-`http://localhost:3000`を開くと、共有のログイン画面へ転送されます。
+- 3つのアプリを、1つのログインと同じロールで使えます。
+- 画面でも AI でも外部の MCP クライアントでも、同じ部署・ロール・本人・状態の条件が、サーバー側で同じように適用されます。
+- AI による書き換えは、利用者が確認カードで内容を確かめて実行してから行います。
+- AI への入力とツールの結果に含まれるプロンプト攻撃を検知します。
 
-## 資産カタログ
+## どう始めるか
 
-資産カタログのフロントエンドは`apps/asset`、資産カタログのバックエンドは`packages/backend-asset`に配置しています。
-資産カタログのバックエンドは、共有のユーザープールに資産カタログのアプリクライアントを作り、マネージドログインのスタイルを割り当てます。
-共有バックエンドのsandboxをデプロイしてから実行します。
+### 前提
 
-```powershell
-$env:AWS_REGION = 'ap-northeast-1'
-npm run sandbox:asset -- --profile amazon-connect --once
-```
+- Node.js 24
+- AWS のアカウントと、デプロイに使うプロファイル（以下の例では `amazon-connect`、リージョンは ap-northeast-1）
+- アカウントで1つの CloudTrail の証跡（[利用者の同期と証跡](../../wiki/利用者の同期と証跡)）
 
-接続設定は`packages/backend-asset/amplify_outputs.json`に自動生成され、資産カタログは`@workops/backend-asset/outputs`として読みます。
-クライアントの戻り先は`http://localhost:3001`です。
+### 手順
 
-`apps/asset/.env.local`に、資産カタログのオリジンを書きます。
+1. 依存を入れて、lint と型チェックを通します。
 
-```dotenv
-AMPLIFY_APP_ORIGIN=http://localhost:3001
-```
+   ```powershell
+   npm ci
+   npm run lint
+   npm run typecheck
+   ```
 
-開発サーバーは、DBに接続するプロファイルを指定して起動します。
+2. 共有バックエンドをデプロイします。ユーザープール・Aurora・AI の機能を作り、マイグレーションを適用します。
 
-```powershell
-$env:AWS_PROFILE = 'amazon-connect'
-npm run dev:asset
-```
+   ```powershell
+   $env:AWS_REGION = 'ap-northeast-1'
+   npm run sandbox -- --profile amazon-connect --once
+   ```
 
-`http://localhost:3001`を開くと、共有のログイン画面へ転送されます。ポータルでログインしてから1時間以内は、ログイン画面を出さずにサインインします。
+3. 3つのアプリのバックエンドをデプロイします。共有のユーザープールに、アプリごとのクライアントを作ります。
 
-## 申請管理
+   ```powershell
+   npm run sandbox:portal -- --profile amazon-connect --once
+   npm run sandbox:asset -- --profile amazon-connect --once
+   npm run sandbox:request -- --profile amazon-connect --once
+   ```
 
-申請管理のフロントエンドは`apps/request`、申請管理のバックエンドは`packages/backend-request`に配置しています。
-資産カタログと同じ形で、sandboxは`npm run sandbox:request -- --profile amazon-connect --once`、開発サーバーは`npm run dev:request`で動かします。
-クライアントの戻り先と`apps/request/.env.local`の`AMPLIFY_APP_ORIGIN`は、`http://localhost:3002`です。
+4. 各アプリの `.env.local`（`apps/portal`・`apps/asset`・`apps/request`）に、アプリのオリジンを書きます。ポータルは `http://localhost:3000`、資産カタログは `3001`、申請管理は `3002` です。
 
-## 共通UI
+   ```dotenv
+   AMPLIFY_APP_ORIGIN=http://localhost:3000
+   ```
 
-3つのアプリの見た目は、`packages/ui`（`@workops/ui`）にまとめています。色のトークン・書体・テーマは`src/styles/globals.css`、shadcn/uiの部品は`src/components`、共通のヘッダーなどWorkopsの部品は`src/workops`に置きます。
-shadcn/uiの部品は、アプリのフォルダーで追加します。部品は`packages/ui/src/components`に入ります。
+5. 最初の管理者とアプリの一覧を登録します。手順は [初期登録](../../wiki/初期登録) にあります。
 
-```powershell
-cd apps/portal
-npx shadcn@latest add <部品名>
-```
+6. 開発サーバーを起動します。
 
-ヘッダーのアプリの切替は、DBの`App`テーブルの`appId`・`name`・`urlDomain`から作ります。`urlDomain`には、環境ごとのアプリのURLを登録します。
-AIチャットのAPIは、`urlDomain`のオリジンからの要求だけを受け付けます。許可するオリジンは、チャットのLambdaが起動するときに読みます。
+   ```powershell
+   $env:AWS_PROFILE = 'amazon-connect'
+   npm run dev:portal
+   ```
 
-## Hosting
+   資産カタログは `npm run dev:asset`、申請管理は `npm run dev:request` です。`http://localhost:3000` を開くと、共通のログイン画面へ移ります。
 
-Hostingのアプリは、共有バックエンド・ポータル・資産カタログ・申請管理の4つです。どれもリポジトリルートの`amplify.yml`でビルドします。
+構成・DB・デプロイの詳しい手順は [Wiki](../../wiki) にあります。
 
-1. 共有バックエンドのアプリを、このリポジトリの`main`ブランチから作ります。
-2. ポータルのアプリを、モノレポのルートを`apps/portal`にして作ります。サービスロールには、共有バックエンドのアプリのサービスロールを指定します。詳細設定の環境変数`BACKEND_APP_ID`に、共有バックエンドのアプリIDを入れます。
-3. ポータルのアプリの`main`ブランチの自動ビルドを止めます。ポータルのビルドは、共有バックエンドのデプロイが成功したときに、ポータルのバックエンドが作るEventBridgeのルールで始まります。
-4. ポータルの最初のビルドで、ポータルのバックエンドがCompute ロールを作ります。このロールを、ポータルのアプリのCompute ロールに割り当てます。
-5. 資産カタログと申請管理のアプリを、モノレポのルートをそれぞれ`apps/asset`・`apps/request`にして、ポータルの2〜4と同じ設定で作ります。
+## どこで助けを得られるか
 
-サーバー側の処理は、Compute ロールで共有のAuroraをData API経由で読み書きします。ポータルの Compute ロールは、ユーザー管理で共有のユーザープールのユーザーも操作します。
+不具合や質問は [Issues](../../issues) に書いてください。
 
-最初の管理者は手で登録します。共有のユーザープールにユーザーを作り、DBの`Department`に部署を、`UserMembership`にそのユーザーの`sub`と部署、`role`を`manager`、`isAdmin`を`true`にした所属を登録します。DBの`User`には、利用者の同期が登録します。
-あわせて、DBの`App`に、ポータル（`appId`は`portal`）・資産カタログ（`asset`）・申請管理（`request`）の名前と`urlDomain`を登録します。
+## 誰が保守しているか
+
+[kyiwanami](https://github.com/kyiwanami)
