@@ -1,11 +1,11 @@
-import { auditLog, department, request, requestType } from '@workops/blocks/schema';
+import { auditLog, department, request, requestType, user } from '@workops/blocks/schema';
 import { and, asc, count, desc, eq, gte, ilike, inArray, lt, ne, or, sql, type SQL } from 'drizzle-orm';
 import { alias, type PgUpdateSetSource } from 'drizzle-orm/pg-core';
 import { z } from 'zod';
 import type { Context } from './context';
 import { BusinessError, roleError } from './errors';
 import { hasRole, type Membership, type MemberRole } from './membership';
-import { getUser, listUsers } from './users';
+import { userName } from './users';
 import type {
   RequestConditions,
   RequestDetail,
@@ -63,20 +63,12 @@ export async function listRequestTypeOptions(
 // 部署の絞り込みは全体管理者だけに効きます。3つのタブの件数と、承認のタブを使えるかと、種別名・部署名・申請者の名前を一緒に返します。
 export async function listRequests(context: Context, conditions: RequestConditions): Promise<RequestList> {
   const { db, member } = context;
-  const users = await listUsers(context);
-  const names = new Map(users.map((user) => [user.sub, user.name]));
-  const keyword = conditions.q?.toLowerCase();
-  // 検索語に名前・メールが当てはまる利用者です。
-  const matchedSubs =
-    keyword === undefined
-      ? []
-      : users.filter((user) => user.name.toLowerCase().includes(keyword) || user.email.toLowerCase().includes(keyword)).map((user) => user.sub);
   const filters = and(
     departmentScope(member),
     member.isAdmin && conditions.department !== null ? eq(request.departmentId, conditions.department) : undefined,
     conditions.q === null
       ? undefined
-      : or(ilike(request.title, `%${conditions.q}%`), matchedSubs.length > 0 ? inArray(request.requesterSub, matchedSubs) : undefined),
+      : or(ilike(request.title, `%${conditions.q}%`), ilike(user.name, `%${conditions.q}%`), ilike(user.email, `%${conditions.q}%`)),
     conditions.type === null ? undefined : eq(request.requestTypeId, conditions.type),
     periodCondition(conditions.period),
   );
@@ -95,6 +87,7 @@ export async function listRequests(context: Context, conditions: RequestConditio
     db
       .select({ all: count(), approve: countWhere(tabConditions.approve), mine: countWhere(tabConditions.mine) })
       .from(request)
+      .leftJoin(user, eq(user.sub, request.requesterSub))
       .where(filters),
     db
       .select({
@@ -103,6 +96,7 @@ export async function listRequests(context: Context, conditions: RequestConditio
         status: request.status,
         amount: request.amount,
         requesterSub: request.requesterSub,
+        requesterName: userName,
         submittedAt: request.submittedAt,
         requestTypeName: requestType.name,
         departmentName: department.name,
@@ -110,6 +104,7 @@ export async function listRequests(context: Context, conditions: RequestConditio
       .from(request)
       .innerJoin(requestType, eq(requestType.id, request.requestTypeId))
       .innerJoin(department, eq(department.id, request.departmentId))
+      .leftJoin(user, eq(user.sub, request.requesterSub))
       .where(and(filters, tabConditions[tab]))
       .orderBy(tab === 'approve' ? asc(request.submittedAt) : desc(request.updatedAt))
       .limit(pageSize)
@@ -123,7 +118,7 @@ export async function listRequests(context: Context, conditions: RequestConditio
     counts,
     total: counts[tab],
     start,
-    requests: rows.map((row) => ({ ...row, requesterName: names.get(row.requesterSub) ?? null })),
+    requests: rows,
   };
 }
 
@@ -143,6 +138,7 @@ export async function getRequest(context: Context, id: string): Promise<RequestD
       requestTypeName: requestType.name,
       departmentName: department.name,
       requesterSub: request.requesterSub,
+      requesterName: userName,
       createdAt: request.createdAt,
       submittedAt: request.submittedAt,
       approvedAt: request.approvedAt,
@@ -155,13 +151,9 @@ export async function getRequest(context: Context, id: string): Promise<RequestD
     .from(request)
     .innerJoin(requestType, eq(requestType.id, request.requestTypeId))
     .innerJoin(department, eq(department.id, request.departmentId))
+    .leftJoin(user, eq(user.sub, request.requesterSub))
     .where(and(eq(request.id, id), departmentScope(context.member)));
-  const row = rows.at(0);
-  if (row === undefined) {
-    return null;
-  }
-  const requester = await getUser(context, row.requesterSub);
-  return { ...row, requesterName: requester?.name ?? null };
+  return rows.at(0) ?? null;
 }
 
 // 申請の操作の決まりです。必要なロール（なければ null）、本人の申請だけか（false は他者の申請だけ）、操作できる今の状態です。

@@ -4,6 +4,7 @@ import { writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ArnFormat, AssetHashType, CfnResource, DockerImage, Duration, Names, Stack } from 'aws-cdk-lib';
+import type { IDependable } from 'constructs';
 import {
   AgentCoreRuntime,
   AgentRuntimeArtifact,
@@ -89,8 +90,10 @@ export function createAiBackend(props: {
   // メタデータ文書で名乗ることを認める MCP クライアントを、提供元ごとに外部のMCPクライアント用のクライアントへ紐づけます。
   // aws-cdk-lib にこのリソースの型がないため、CloudFormation のリソースを直接書きます。
   // クライアント側の文書の変更に早く追従するため、文書を保持する時間は最小の1日にします。
+  // Cognito はユーザープールのドメインとポリシーの変更を同時に1件しか受け付けないため、ドメインのあとに1つずつ作ります。
+  let previous: IDependable = userPool;
   for (const provider of mcpClientProviders) {
-    new CfnResource(userPoolStack, `CimdPolicy-${provider.name}`, {
+    const policy = new CfnResource(userPoolStack, `CimdPolicy-${provider.name}`, {
       type: 'AWS::Cognito::CIMDPolicy',
       properties: {
         UserPoolId: userPool.userPoolId,
@@ -100,6 +103,8 @@ export function createAiBackend(props: {
         CacheDuration: Duration.days(1).toSeconds(),
       },
     });
+    policy.node.addDependency(previous);
+    previous = policy;
   }
 
   // チャットの経路で、Webアプリのトークンを Gateway 用のトークンに交換するクライアントです。
@@ -158,12 +163,9 @@ export function createAiBackend(props: {
       DATABASE_NAME: props.databaseName,
       SECRET_ARN: cluster.secret.secretArn,
       CLUSTER_ARN: cluster.clusterArn,
-      USER_POOL_ID: userPool.userPoolId,
     },
   });
   cluster.grantDataApiAccess(runtime);
-  // 担当者・申請者の名前を表示するため、ユーザープールの利用者を読みます。
-  userPool.grant(runtime, 'cognito-idp:ListUsers');
   // 自動計装がスパンを Runtime のロググループに出すために要ります。Runtime の ID はこの権限のあとで決まるため、Runtime のロググループ全体を対象にします。
   runtime.addToRolePolicy(
     new PolicyStatement({

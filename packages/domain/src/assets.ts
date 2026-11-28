@@ -1,10 +1,10 @@
-import { asset, assetType, department, userMembership } from '@workops/blocks/schema';
-import { and, asc, count, desc, eq, exists, ilike, inArray, or } from 'drizzle-orm';
+import { asset, assetType, department, user, userMembership } from '@workops/blocks/schema';
+import { and, asc, count, desc, eq, exists, ilike, or } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Context } from './context';
 import { BusinessError, notFoundError, roleError } from './errors';
 import { hasRole, type Membership } from './membership';
-import { getUser, listUsers } from './users';
+import { userName } from './users';
 import type { AssetChanges, AssetConditions, AssetDetail, AssetList, assetSchema, AssetTypeOption } from '@workops/schema/assets';
 
 // 一覧の1ページの件数です。
@@ -26,62 +26,45 @@ export async function listAssetTypeOptions(context: Context): Promise<AssetTypeO
 // 検索語があれば、名前・メールの部分一致で絞り込みます。
 export async function listMembers(context: Context, departmentId: string | null, q: string | null) {
   const { db, member } = context;
-  const [users, memberships] = await Promise.all([
-    listUsers(context),
-    db
-      .select({ sub: userMembership.sub, departmentId: userMembership.departmentId })
-      .from(userMembership)
-      .where(
-        and(
-          member.isAdmin ? undefined : eq(userMembership.departmentId, member.departmentId),
-          departmentId === null ? undefined : eq(userMembership.departmentId, departmentId),
-        ),
+  return db
+    .select({ sub: user.sub, name: userName, email: user.email, departmentId: userMembership.departmentId })
+    .from(userMembership)
+    .innerJoin(user, eq(user.sub, userMembership.sub))
+    .where(
+      and(
+        eq(user.enabled, true),
+        member.isAdmin ? undefined : eq(userMembership.departmentId, member.departmentId),
+        departmentId === null ? undefined : eq(userMembership.departmentId, departmentId),
+        q === null ? undefined : or(ilike(user.name, `%${q}%`), ilike(user.email, `%${q}%`)),
       ),
-  ]);
-  const keyword = q?.toLowerCase();
-  const usersBySub = new Map(
-    users
-      .filter((user) => user.enabled && (keyword === undefined || user.name.toLowerCase().includes(keyword) || user.email.toLowerCase().includes(keyword)))
-      .map((user) => [user.sub, user]),
-  );
-  return memberships
-    .flatMap((membership) => {
-      const user = usersBySub.get(membership.sub);
-      return user === undefined ? [] : [{ sub: user.sub, name: user.name, email: user.email, departmentId: membership.departmentId }];
-    })
-    .sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+    )
+    .orderBy(asc(userName));
 }
 
 // 資産の一覧です。名称または担当者の名前・メールの部分一致・状態・種別・部署で絞り込み、更新日時の新しい順で1ページ分を返します。
 // 部署の絞り込みは全体管理者だけに効きます。種別名・部署名・担当者の名前を一緒に返します。
 export async function listAssets(context: Context, conditions: AssetConditions): Promise<AssetList> {
   const { db, member } = context;
-  const users = await listUsers(context);
-  const keyword = conditions.q?.toLowerCase();
-  // 検索語に名前・メールが当てはまる利用者です。
-  const matchedSubs =
-    keyword === undefined
-      ? []
-      : users.filter((user) => user.name.toLowerCase().includes(keyword) || user.email.toLowerCase().includes(keyword)).map((user) => user.sub);
   const where = and(
     departmentScope(member),
     member.isAdmin && conditions.department !== null ? eq(asset.departmentId, conditions.department) : undefined,
     conditions.q === null
       ? undefined
-      : or(ilike(asset.name, `%${conditions.q}%`), matchedSubs.length > 0 ? inArray(asset.assigneeSub, matchedSubs) : undefined),
+      : or(ilike(asset.name, `%${conditions.q}%`), ilike(user.name, `%${conditions.q}%`), ilike(user.email, `%${conditions.q}%`)),
     conditions.status === null ? undefined : eq(asset.status, conditions.status),
     conditions.type === null ? undefined : eq(asset.assetTypeId, conditions.type),
   );
   // 1 より前のページは1ページ目として扱う
   const start = (Math.max(conditions.page, 1) - 1) * pageSize;
   const [counts, rows] = await Promise.all([
-    db.select({ total: count() }).from(asset).where(where),
+    db.select({ total: count() }).from(asset).leftJoin(user, eq(user.sub, asset.assigneeSub)).where(where),
     db
       .select({
         id: asset.id,
         name: asset.name,
         status: asset.status,
         assigneeSub: asset.assigneeSub,
+        assigneeName: userName,
         updatedAt: asset.updatedAt,
         assetTypeName: assetType.name,
         departmentName: department.name,
@@ -89,17 +72,13 @@ export async function listAssets(context: Context, conditions: AssetConditions):
       .from(asset)
       .innerJoin(assetType, eq(assetType.id, asset.assetTypeId))
       .innerJoin(department, eq(department.id, asset.departmentId))
+      .leftJoin(user, eq(user.sub, asset.assigneeSub))
       .where(where)
       .orderBy(desc(asset.updatedAt))
       .limit(pageSize)
       .offset(start),
   ]);
-  const namesBySub = new Map(users.map((user) => [user.sub, user.name]));
-  return {
-    total: counts[0].total,
-    start,
-    assets: rows.map((row) => ({ ...row, assigneeName: row.assigneeSub === null ? null : (namesBySub.get(row.assigneeSub) ?? null) })),
-  };
+  return { total: counts[0].total, start, assets: rows };
 }
 
 // 資産の詳細です。扱える部署の資産でなければ null を返します。部署名・種別名・担当者の名前を一緒に返します。
@@ -117,39 +96,27 @@ export async function getAsset(context: Context, id: string): Promise<AssetDetai
       assetTypeName: assetType.name,
       status: asset.status,
       assigneeSub: asset.assigneeSub,
+      assigneeName: userName,
       updatedAt: asset.updatedAt,
     })
     .from(asset)
     .innerJoin(assetType, eq(assetType.id, asset.assetTypeId))
     .innerJoin(department, eq(department.id, asset.departmentId))
+    .leftJoin(user, eq(user.sub, asset.assigneeSub))
     .where(and(eq(asset.id, id), departmentScope(context.member)));
-  const row = rows.at(0);
-  if (row === undefined) {
-    return null;
-  }
-  const assignee = row.assigneeSub === null ? null : await getUser(context, row.assigneeSub);
-  return { ...row, assigneeName: assignee?.name ?? null };
+  return rows.at(0) ?? null;
 }
 
 // 担当者の決まり（資産-05）に合わないときのエラーです。
 const assigneeError = () => new BusinessError('担当者は、資産の部署の有効な利用者から選んでください。');
 
-// 担当者が有効な利用者であることを確かめます。有効区分は Cognito にあります。
-async function checkEnabled(context: Context, sub: string) {
-  const user = await getUser(context, sub);
-  if (user === null || !user.enabled) {
-    throw assigneeError();
-  }
-}
-
-// 担当者が、更新する資産の部署に所属していることの条件です。
-const belongsToAssetDepartment = (context: Context, sub: string) =>
-  exists(
-    context.db
-      .select({ sub: userMembership.sub })
-      .from(userMembership)
-      .where(and(eq(userMembership.sub, sub), eq(userMembership.departmentId, asset.departmentId))),
-  );
+// 担当者が、部署に所属する有効な利用者を探す問い合わせです（資産-05）。
+const assigneeQuery = (context: Context, sub: string, departmentId: typeof asset.departmentId | string) =>
+  context.db
+    .select({ sub: userMembership.sub })
+    .from(userMembership)
+    .innerJoin(user, eq(user.sub, userMembership.sub))
+    .where(and(eq(userMembership.sub, sub), eq(userMembership.departmentId, departmentId), eq(user.enabled, true)));
 
 // 資産を登録し、登録した資産の ID を返します。担当者以上が使えます。
 // 全体管理者は選んだ部署、それ以外は自部署に登録します。担当者は、その部署の有効な利用者か未割当です。作成者・更新者は操作する利用者です。
@@ -160,12 +127,8 @@ export async function createAsset(context: Context, values: z.infer<typeof asset
   }
   const departmentId = member.isAdmin ? values.departmentId : member.departmentId;
   if (values.assigneeSub !== null) {
-    await checkEnabled(context, values.assigneeSub);
-    const memberships = await db
-      .select({ sub: userMembership.sub })
-      .from(userMembership)
-      .where(and(eq(userMembership.sub, values.assigneeSub), eq(userMembership.departmentId, departmentId)));
-    if (memberships.length === 0) {
+    const assignees = await assigneeQuery(context, values.assigneeSub, departmentId);
+    if (assignees.length === 0) {
       throw assigneeError();
     }
   }
@@ -195,9 +158,6 @@ export async function updateAsset(context: Context, id: string, values: AssetCha
     throw roleError();
   }
   const assigneeSub = values.assigneeSub;
-  if (assigneeSub !== undefined && assigneeSub !== null) {
-    await checkEnabled(context, assigneeSub);
-  }
   const updated = await db
     .update(asset)
     .set({
@@ -212,7 +172,7 @@ export async function updateAsset(context: Context, id: string, values: AssetCha
       and(
         eq(asset.id, id),
         departmentScope(member),
-        assigneeSub === undefined || assigneeSub === null ? undefined : belongsToAssetDepartment(context, assigneeSub),
+        assigneeSub === undefined || assigneeSub === null ? undefined : exists(assigneeQuery(context, assigneeSub, asset.departmentId)),
       ),
     )
     .returning({ id: asset.id });

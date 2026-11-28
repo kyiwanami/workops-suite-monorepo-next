@@ -39,10 +39,12 @@ export async function createBlocksBackend(root: Stack) {
   });
   db.grantDataApiAccess(isComplete);
   const provider = new Provider(scope, 'MigrateProvider', { onEventHandler: onEvent, isCompleteHandler: isComplete });
-  new CustomResource(scope, 'Migrate', {
+  const migrate = new CustomResource(scope, 'Migrate', {
     serviceToken: provider.serviceToken,
     properties: { migrations: migrations.layerVersionArn },
   });
+  // 新しく作るときは、DBのインスタンスができてから適用します。
+  migrate.node.addDependency(db);
 
   // Blocksが生成するDBと、その接続先とSecretの参照を共有します。DBは、ほかの関数にData APIの権限を付けるときに使います。
   return { cluster: db, secretArn: db.secret.secretArn, databaseName };

@@ -1,7 +1,6 @@
 import { env } from '$amplify/env/chat';
 import { type Event, UnauthorizedException } from '@aws-sdk/client-bedrock-agentcore';
 import { ApplyGuardrailCommand, BedrockRuntimeClient } from '@aws-sdk/client-bedrock-runtime';
-import { CognitoIdentityProviderClient } from '@aws-sdk/client-cognito-identity-provider';
 import type { MCPClient } from '@ai-sdk/mcp';
 import { streamHandle } from '@hono/aws-lambda';
 import { isSpecType } from '@modelcontextprotocol/client';
@@ -34,7 +33,6 @@ import { createHarnessModel } from './harness';
 import { type ChatMessage, listConversations, listEvents, pendingToolUses, sessionId, toMessages, toUIMessages } from './memory';
 
 const bedrock = new BedrockRuntimeClient({ region: env.AWS_REGION });
-const cognito = new CognitoIdentityProviderClient({ region: env.AWS_REGION });
 const db = createDatabase({
   region: env.AWS_REGION,
   database: env.DATABASE_NAME,
@@ -289,7 +287,7 @@ async function recordCards(input: {
   const { sub, conversationId, writer } = input;
   const now = new Date().toISOString();
   const member = await getMembership(db, sub);
-  const context = member === null ? null : { db, cognito, userPoolId: env.USER_POOL_ID, member };
+  const context = member === null ? null : { db, member };
   const cards = await Promise.all(
     input.toolCalls.map(async (toolCall) => {
       const target = context === null ? null : await readTarget(context, toolCall.toolName, toolCall.input);

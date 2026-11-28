@@ -6,7 +6,6 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { cache } from 'react';
 import { getApps } from './app';
-import { cognito, userPoolId } from './cognito';
 import { db } from './db';
 
 // ログイン中の利用者を取得する処理を、アプリのクライアントの設定で作ります。
@@ -44,7 +43,7 @@ export const createUserQueries = (runWithAmplifyServerContext: NextServer.RunOpe
   };
 
   // ログイン中の利用者が業務の処理を呼ぶときの、接続と利用者です。
-  const getContext = async () => ({ db, cognito, userPoolId, member: await getMember() });
+  const getContext = async () => ({ db, member: await getMember() });
 
   return { getMembership, getEmail, getMember, getContext };
 };

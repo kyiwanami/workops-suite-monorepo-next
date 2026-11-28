@@ -2,7 +2,7 @@ import { getAsset, listAssetTypeOptions } from '@workops/domain/assets';
 import type { Context } from '@workops/domain/context';
 import { listDepartmentOptions } from '@workops/domain/departments';
 import { getOperations, getRequest, listRequestTypeOptions } from '@workops/domain/requests';
-import { getUser } from '@workops/domain/users';
+import { getUserName } from '@workops/domain/users';
 import { assetIdSchema } from '@workops/schema/assets';
 import { requestIdSchema } from '@workops/schema/requests';
 import { writeTools } from '@workops/schema/tools';
@@ -32,7 +32,7 @@ const nameReaders = new Map<string, (context: Context, id: string) => Promise<st
   ['assetTypeId', async (context, id) => (await listAssetTypeOptions(context)).find((option) => option.id === id)?.name],
   ['departmentId', async (context, id) => (await listDepartmentOptions(context)).find((option) => option.id === id)?.name],
   ['requestTypeId', async (context, id) => (await listRequestTypeOptions(context, false)).find((option) => option.id === id)?.name],
-  ['assigneeSub', async (context, id) => (await getUser(context, id))?.name],
+  ['assigneeSub', async (context, id) => (await getUserName(context, id)) ?? undefined],
 ]);
 
 // 確認カードの入力の ID の項目のうち、対象の今の値と違う（変えたあとの）項目の名前を引きます。変えない項目の名前は、対象の値にあります。

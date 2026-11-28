@@ -38,7 +38,7 @@ import {
   requestWithOperationsSchema,
 } from '@workops/schema/requests';
 import { writeToolCards } from '@workops/schema/tools';
-import { cognito, db, userPoolId } from './connections';
+import { db } from './connections';
 
 // ツールの処理を、呼び出した利用者として実行します。利用者は Gateway のインターセプターが `_meta` に入れた識別子です。
 // 読み取りで対象が見つからないときは null が返るため、失敗にします。
@@ -57,7 +57,7 @@ async function run<T extends JSONObject>(
     if (member === null) {
       throw new BusinessError('所属が登録されていないため、操作できません。');
     }
-    const result = await operate({ db, cognito, userPoolId, member });
+    const result = await operate({ db, member });
     if (result === null) {
       throw notFoundError();
     }

@@ -51,7 +51,7 @@ export async function resendInvitationAction(email: string) {
 
 // ユーザーを有効にし、有効にした旨を出す詳細へ戻ります。
 export async function enableUserAction(formData: FormData) {
-  const sub = z.uuid().parse(formData.get('sub'));
+  const sub = z.guid().parse(formData.get('sub'));
   await enableUser(sub);
   revalidatePath(`/admin/users/${sub}`);
   redirect(serializeUserDetailSearchParams(`/admin/users/${sub}`, { done: 'enabled' }));
@@ -59,7 +59,7 @@ export async function enableUserAction(formData: FormData) {
 
 // ユーザーを無効にし、無効にした旨を出す詳細へ戻ります。
 export async function disableUserAction(formData: FormData) {
-  const sub = z.uuid().parse(formData.get('sub'));
+  const sub = z.guid().parse(formData.get('sub'));
   await disableUser(sub);
   revalidatePath(`/admin/users/${sub}`);
   redirect(serializeUserDetailSearchParams(`/admin/users/${sub}`, { done: 'disabled' }));
@@ -67,7 +67,7 @@ export async function disableUserAction(formData: FormData) {
 
 // ユーザーを削除し、削除した旨を出す一覧へ戻ります。
 export async function deleteUserAction(formData: FormData) {
-  await deleteUser(z.uuid().parse(formData.get('sub')));
+  await deleteUser(z.guid().parse(formData.get('sub')));
   revalidatePath('/admin/users');
   redirect(serializeUserSearchParams('/admin/users', { done: 'deleted' }));
 }

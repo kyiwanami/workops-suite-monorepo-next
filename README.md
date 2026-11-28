@@ -31,7 +31,7 @@ Aurora PostgreSQL 17.11をData API経由で使用します。容量は0～2 ACU�
 
 ```powershell
 $env:AWS_REGION = 'ap-northeast-1'
-npm run sandbox -- --profile amazon-connect --identifier workops-next --once
+npm run sandbox -- --profile amazon-connect --once
 ```
 
 DB接続にはBlocksが生成する管理者用Secretを使用します。
@@ -40,6 +40,25 @@ DB接続にはBlocksが生成する管理者用Secretを使用します。
 接続設定は`packages/backend/amplify_outputs.json`に自動生成されます。`auth`にユーザープールIDとリージョン、`custom.authDomain`にドメイン、`custom.database`にDB接続情報が入ります。
 `clusterArn`、Blocks標準の`secretArn`、`databaseName`を出力し、認証情報の値はSecrets Managerで管理します。
 このファイルは手動編集せず、Git管理から除外します。
+
+### 利用者の同期
+
+Cognitoの利用者の作成・属性の変更・有効化・無効化・削除を、DBの`User`に反映します。操作はアカウントのCloudTrailの証跡が記録し、環境ごとのEventBridgeのルールが同期のLambda（`user-sync`）に渡します。
+
+証跡はアカウントで1つだけ作ります。アプリのスタックでは作りません。ap-northeast-1の書き込みの管理イベントを、S3のバケットに90日残します。
+
+| 資源 | 名前 |
+| --- | --- |
+| 証跡 | `management-events` |
+| S3のバケット | `cloudtrail-management-events-<アカウントID>-ap-northeast-1` |
+
+新しいアカウントでは、最初のデプロイの前に次の順で作ります。
+
+1. S3のバケットを作り、パブリックアクセスをすべてブロックし、90日で削除するライフサイクルを付けます。
+2. バケットポリシーで、CloudTrailに`s3:GetBucketAcl`と`AWSLogs/<アカウントID>/`への`s3:PutObject`を許可し（`aws:SourceArn`を証跡に限る）、HTTPS以外の接続を拒否します。
+3. 証跡を作り（単一リージョン、ログファイルの検証あり）、イベントセレクターを管理イベントの書き込みだけにして、ログ記録を始めます。
+
+環境を新しく作ったときは、デプロイのあとに同期のLambdaを引数なし（`{}`）で1度呼び、既存の利用者を取り込みます。
 
 ## ポータル
 

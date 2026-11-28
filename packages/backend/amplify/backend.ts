@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 import { defineBackend } from '@aws-amplify/backend';
 import { createBlocksBackend } from '@workops/blocks/cdk';
 import { Stack } from 'aws-cdk-lib';
+import { Rule } from 'aws-cdk-lib/aws-events';
+import { LambdaFunction } from 'aws-cdk-lib/aws-events-targets';
 import {
   FeaturePlan,
   LambdaVersion,
@@ -15,8 +17,9 @@ import { createAiBackend } from './ai';
 import { chat } from './functions/chat/resource';
 import { gatewayInterceptor } from './functions/gateway-interceptor/resource';
 import { preTokenGeneration } from './functions/pre-token-generation/resource';
+import { userSync } from './functions/user-sync/resource';
 
-const app = defineBackend({ preTokenGeneration, gatewayInterceptor, chat });
+const app = defineBackend({ preTokenGeneration, gatewayInterceptor, chat, userSync });
 
 // Blocks の Aurora と、デプロイ時に Drizzle のマイグレーションを適用する仕組みを構築します。
 const database = await createBlocksBackend(app.createStack('blocks'));
@@ -60,6 +63,43 @@ userPool.addTrigger(
   LambdaVersion.V2_0,
 );
 
+// Cognito の利用者の操作（管理コンソールからの操作も含む）を、DB の利用者に反映します。
+// 操作は、アカウントの CloudTrail の証跡が記録し、EventBridge が受けます。証跡は構築の手順で作ります（README）。
+for (const [name, value] of Object.entries({
+  DATABASE_NAME: database.databaseName,
+  SECRET_ARN: database.secretArn,
+  CLUSTER_ARN: database.cluster.clusterArn,
+  USER_POOL_ID: userPool.userPoolId,
+})) {
+  app.userSync.addEnvironment(name, value);
+}
+database.cluster.grantDataApiAccess(app.userSync.resources.lambda);
+userPool.grant(app.userSync.resources.lambda, 'cognito-idp:ListUsers');
+new Rule(stack, 'UserSyncRule', {
+  eventPattern: {
+    source: ['aws.cognito-idp'],
+    detailType: ['AWS API Call via CloudTrail'],
+    detail: {
+      eventSource: ['cognito-idp.amazonaws.com'],
+      eventName: [
+        'AdminCreateUser',
+        'SignUp',
+        'ConfirmSignUp',
+        'AdminConfirmSignUp',
+        'AdminUpdateUserAttributes',
+        'UpdateUserAttributes',
+        'AdminDeleteUserAttributes',
+        'DeleteUserAttributes',
+        'AdminEnableUser',
+        'AdminDisableUser',
+        'AdminDeleteUser',
+        'DeleteUser',
+      ],
+    },
+  },
+  targets: [new LambdaFunction(app.userSync.resources.lambda)],
+});
+
 // Gateway のインターセプターが、トークンを検証するためのユーザープールです。
 app.gatewayInterceptor.addEnvironment('USER_POOL_ID', userPool.userPoolId);
 
@@ -80,12 +120,9 @@ for (const [name, value] of Object.entries({
   DATABASE_NAME: database.databaseName,
   SECRET_ARN: database.secretArn,
   CLUSTER_ARN: database.cluster.clusterArn,
-  USER_POOL_ID: userPool.userPoolId,
 })) {
   app.chat.addEnvironment(name, value);
 }
-// 確認カードに担当者・申請者の名前を出すため、ユーザープールの利用者を読みます。
-userPool.grant(app.chat.resources.lambda, 'cognito-idp:ListUsers');
 
 // 各アプリがクライアントを作るときと、サーバー側の処理で読む値です。
 app.addOutput({

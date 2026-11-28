@@ -20,6 +20,15 @@ export const department = pgTable('Department', {
   ...commonColumns,
 });
 
+// 利用者。Cognito の利用者を、利用者の同期の Lambda が反映します。作成者・更新者には同期の印を入れます。
+export const user = pgTable('User', {
+  sub: text().primaryKey(), // 利用者識別子（Cognito sub）
+  name: text(), // 名前。自分で登録した利用者は未設定のことがある
+  email: text().notNull(), // メール
+  enabled: boolean().notNull(), // Cognito で有効か
+  ...commonColumns,
+});
+
 // ユーザー所属
 export const userMembership = pgTable('UserMembership', {
   sub: text().primaryKey(), // 利用者識別子（Cognito sub）

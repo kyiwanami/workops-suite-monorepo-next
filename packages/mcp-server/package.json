@@ -10,7 +10,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@aws-sdk/client-cognito-identity-provider": "3.1164.0",
     "@hono/node-server": "2.1.11",
     "@modelcontextprotocol/server": "2.4.0",
     "@workops/domain": "*",
