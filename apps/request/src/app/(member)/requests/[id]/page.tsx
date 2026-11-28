@@ -3,9 +3,9 @@ import { Alert, AlertDescription, AlertTitle } from '@workops/ui/components/aler
 import { Badge } from '@workops/ui/components/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@workops/ui/components/card';
 import { ConfirmButton } from '@workops/ui/workops/confirm-button';
+import { PageBreadcrumb } from '@workops/ui/workops/page-breadcrumb';
 import { PageHeader } from '@workops/ui/workops/page-header';
 import { CircleX, CornerUpLeft } from 'lucide-react';
-import Link from 'next/link';
 import type { SearchParams } from 'nuqs/server';
 import { approveRequestAction, deleteRequestAction, withdrawRequestAction } from '@/server/requests/actions';
 import { ActionBar } from '@/features/requests/components/ActionBar';
@@ -39,13 +39,9 @@ export default async function RequestPage({ params, searchParams }: { params: Pr
     .sort((a, b) => a.at.localeCompare(b.at));
   return (
     <div className="grid gap-6 max-md:pb-20">
-      <nav className="text-sm text-muted-foreground">
-        <Link href="/requests" className="font-bold text-primary hover:underline">
-          申請
-        </Link>
-        {' ／ '}
+      <PageBreadcrumb href="/requests" label="申請">
         {request.title}
-      </nav>
+      </PageBreadcrumb>
       <PageHeader
         title={
           <span className="flex flex-wrap items-center gap-3">

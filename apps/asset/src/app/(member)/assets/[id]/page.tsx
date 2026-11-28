@@ -1,9 +1,9 @@
 import { Badge } from '@workops/ui/components/badge';
 import { Card, CardContent } from '@workops/ui/components/card';
 import { ConfirmButton } from '@workops/ui/workops/confirm-button';
+import { PageBreadcrumb } from '@workops/ui/workops/page-breadcrumb';
 import { PageHeader } from '@workops/ui/workops/page-header';
 import { hasRole } from '@workops/domain/membership';
-import Link from 'next/link';
 import { deleteAssetAction } from '@/server/assets/actions';
 import { AssetForm } from '@/features/assets/components/AssetForm';
 import { getAsset, listAssetTypeOptions, listMembers } from '@/server/assets/data';
@@ -21,13 +21,9 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
     : [[], []];
   return (
     <>
-      <nav className="text-sm text-muted-foreground">
-        <Link href="/assets" className="font-bold text-primary hover:underline">
-          資産
-        </Link>
-        {' ／ '}
+      <PageBreadcrumb href="/assets" label="資産">
         {asset.name}
-      </nav>
+      </PageBreadcrumb>
       <PageHeader
         title={
           <span className="flex flex-wrap items-center gap-3">

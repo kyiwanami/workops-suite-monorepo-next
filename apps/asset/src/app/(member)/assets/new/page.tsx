@@ -1,6 +1,6 @@
+import { PageBreadcrumb } from '@workops/ui/workops/page-breadcrumb';
 import { PageHeader } from '@workops/ui/workops/page-header';
 import { hasRole } from '@workops/domain/membership';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AssetForm } from '@/features/assets/components/AssetForm';
 import { listAssetTypeOptions, listDepartmentOptions, listMembers } from '@/server/assets/data';
@@ -19,13 +19,9 @@ export default async function NewAssetPage() {
   ]);
   return (
     <>
-      <nav className="text-sm text-muted-foreground">
-        <Link href="/assets" className="font-bold text-primary hover:underline">
-          資産
-        </Link>
-        {' ／ '}
+      <PageBreadcrumb href="/assets" label="資産">
         登録
-      </nav>
+      </PageBreadcrumb>
       <PageHeader title="資産を登録する" />
       <AssetForm
         asset={null}

@@ -1,7 +1,7 @@
 import { Badge } from '@workops/ui/components/badge';
+import { PageBreadcrumb } from '@workops/ui/workops/page-breadcrumb';
 import { PageHeader } from '@workops/ui/workops/page-header';
 import { hasRole } from '@workops/domain/membership';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { RequestForm } from '@/features/requests/components/RequestForm';
 import { listRequestTypeOptions } from '@/server/requests/data';
@@ -17,12 +17,9 @@ export default async function NewRequestPage() {
   const requestTypes = await listRequestTypeOptions(true);
   return (
     <div className="grid gap-6 max-md:pb-20">
-      <nav className="text-sm text-muted-foreground">
-        <Link href="/requests" className="font-bold text-primary hover:underline">
-          申請
-        </Link>
-        {' ／ '}新しい申請
-      </nav>
+      <PageBreadcrumb href="/requests" label="申請">
+        新しい申請
+      </PageBreadcrumb>
       <PageHeader
         title={
           <span className="flex flex-wrap items-center gap-3">

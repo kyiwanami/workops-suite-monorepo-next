@@ -61,6 +61,8 @@ export function UserMenu({
         </DropdownMenuRadioGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
+          {/* ログアウトは Route Handler へ画面ごと移る。Link は先読みでログアウトしてしまう */}
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
           <a href="/api/auth/sign-out">ログアウト</a>
         </DropdownMenuItem>
       </DropdownMenuContent>

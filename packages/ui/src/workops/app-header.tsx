@@ -1,3 +1,4 @@
+import type { MemberRole } from '@workops/domain/membership';
 import { roleLabels } from '@workops/ui/lib/roles';
 import { AppNav } from './app-nav';
 import { Logo } from './logo';
@@ -13,7 +14,7 @@ export function AppHeader({
   apps: { appId: string; name: string; urlDomain: string }[];
   currentAppId: string;
   email: string | undefined;
-  membership: { departmentName: string; role: string; isAdmin: boolean } | null;
+  membership: { departmentName: string; role: MemberRole; isAdmin: boolean } | null;
 }) {
   const portal = apps.find((app) => app.appId === 'portal');
   // 「部署・ロール」の表示です。所属が未設定の利用者には出しません。

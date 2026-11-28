@@ -1,7 +1,7 @@
 import { Alert, AlertTitle } from '@workops/ui/components/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@workops/ui/components/card';
 import { formatDateTime } from '@workops/ui/lib/labels';
-import Link from 'next/link';
+import { PageBreadcrumb } from '@workops/ui/workops/page-breadcrumb';
 import type { SearchParams } from 'nuqs/server';
 import { AccountActions } from '@/features/users/components/AccountActions';
 import { MembershipForm } from '@/features/users/components/MembershipForm';
@@ -18,13 +18,9 @@ export default async function UserPage({ params, searchParams }: { params: Promi
   const displayName = user.name ?? user.email;
   return (
     <>
-      <nav className="text-sm text-muted-foreground">
-        <Link href="/admin/users" className="font-bold text-primary hover:underline">
-          ユーザー
-        </Link>
-        {' ／ '}
+      <PageBreadcrumb href="/admin/users" label="ユーザー">
         {displayName}
-      </nav>
+      </PageBreadcrumb>
       <AccountActions
         sub={user.sub}
         email={user.email}

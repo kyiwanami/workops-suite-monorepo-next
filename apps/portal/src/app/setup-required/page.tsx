@@ -1,5 +1,6 @@
 import { Button } from '@workops/ui/components/button';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from '@workops/ui/components/empty';
+import Link from 'next/link';
 import { getEmail } from '@/server/user';
 
 // 部署・ロールが未設定の利用者に、全体管理者による設定が必要なことと、次の行動を伝えます。
@@ -18,9 +19,11 @@ export default async function SetupRequiredPage() {
         <EmptyContent>
           <div className="flex flex-wrap justify-center gap-2">
             <Button asChild>
-              <a href="/">再読み込みする</a>
+              <Link href="/">再読み込みする</Link>
             </Button>
             <Button variant="outline" asChild>
+              {/* ログアウトは Route Handler へ画面ごと移る。Link は先読みでログアウトしてしまう */}
+              {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
               <a href="/api/auth/sign-out">ログアウトする</a>
             </Button>
           </div>

@@ -1,4 +1,6 @@
 import js from "@eslint/js";
+import nextPlugin from "@next/eslint-plugin-next";
+import reactHooks from "eslint-plugin-react-hooks";
 import { defineConfig, globalIgnores } from "eslint/config";
 import tseslint from "typescript-eslint";
 
@@ -9,6 +11,13 @@ export default defineConfig([
   globalIgnores(["**/.next/", "**/.amplify/", "**/dist/", "**/dev-dist/", "tmp/", "packages/ui/src/components/", "packages/ui/src/hooks/", "**/next-env.d.ts"]),
 
   js.configs.recommended,
+
+  // Next のアプリと共通の画面の部品に、Next と React Hooks の推奨のルールを当てます。
+  {
+    files: ["apps/**/*.{ts,tsx}", "packages/ui/src/**/*.{ts,tsx}"],
+    extends: [nextPlugin.configs["core-web-vitals"], reactHooks.configs.flat.recommended],
+    settings: { next: { rootDir: "apps/*/" } }
+  },
 
   {
     files: ["**/*.{ts,tsx}"],

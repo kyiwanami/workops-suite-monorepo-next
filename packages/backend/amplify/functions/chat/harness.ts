@@ -9,6 +9,7 @@ import {
   type LanguageModelV4Usage,
   UnsupportedFunctionalityError,
 } from '@ai-sdk/provider';
+import { createNullLanguageModelUsage } from '@ai-sdk/provider-utils';
 import {
   BedrockAgentCoreClient,
   HarnessConversationRole,
@@ -222,6 +223,8 @@ function toStreamParts({ sent, inline }: { sent: Set<string>; inline: Set<string
   type Controller = TransformStreamDefaultController<LanguageModelV4StreamPart>;
   let finishReason: LanguageModelV4FinishReason = { unified: 'interrupted', raw: undefined };
   const usage = { inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0, cacheWriteInputTokens: 0 };
+  // 使用量を1度でも受け取ったかです。受け取らなければ、使用量は不明として返します。
+  let usageReported = false;
   const contentBlocks = new Map<number, ContentBlock>();
   // Harness: 内容の番号は発話ごとに数え直されるため、発話の番号と組にして部品のIDにします。
   let message = 0;
@@ -342,6 +345,7 @@ function toStreamParts({ sent, inline }: { sent: Set<string>; inline: Set<string
 
   // Harness: 1回の応答の中でモデルを何度も呼ぶため、使用量を足し合わせます。
   function addUsage(tokens: HarnessTokenUsage) {
+    usageReported = true;
     usage.inputTokens += tokens.inputTokens ?? 0;
     usage.outputTokens += tokens.outputTokens ?? 0;
     usage.cacheReadInputTokens += tokens.cacheReadInputTokens ?? 0;
@@ -386,7 +390,7 @@ function toStreamParts({ sent, inline }: { sent: Set<string>; inline: Set<string
       }
     },
     flush(controller) {
-      controller.enqueue({ type: 'finish', finishReason, usage: convertUsage(usage) });
+      controller.enqueue({ type: 'finish', finishReason, usage: usageReported ? convertUsage(usage) : createNullLanguageModelUsage() });
     },
   });
 }
